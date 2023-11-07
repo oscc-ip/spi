@@ -2,7 +2,7 @@ SIM_TOOL    ?= iverilog
 RUN_TOOL    ?= vvp
 WAVE_FORMAT ?=
 
-SIM_APP  ?= {{$$IP_NAME$$}}
+SIM_APP  ?= spi_clkgen
 SIM_TOP   := $(SIM_APP)_tb
 TEST_ARGS ?= default_args
 
@@ -20,8 +20,9 @@ INC_LIST     :=
 FILE_LIST    :=
 SIMV_PROG    := simv
 
-INC_LIST += -I ./rtl
-INC_LIST += -I ./tb
+INC_LIST += -I ../rtl
+INC_LIST += -I ../tb
+FILE_LIST += -f ../tb/spi_clkgen.f
 
 comp:
 	@mkdir -p build
