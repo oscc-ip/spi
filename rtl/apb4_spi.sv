@@ -8,40 +8,12 @@
 // MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-// verilog_format: off
-`define SPI_CTRL 4'b0000 //BASEADDR+0x00
-`define SPI_TX   4'b0001 //BASEADDR+0x04
-`define SPI_RX   4'b0010 //BASEADDR+0x08
-// verilog_format: on
+`include "register.sv"
+`include "spi_define.sv"
 
-/* register mapping
- * SPI_CTRL:
- * BITS:   | 31:24  | 23:21 | 20   | 19 | 18 | 17  | 16  | 15:8 | 7:6 | 5    | 4   | 3   | 2   | 1    | 0    |
- * FIELDS: | RES    | NSS   | BUSY | ST | EN | RXE | TXE | DIV  | DTB | MSTR | RDM | ASS | LSB | CPOL | CPHA |
- * PERMS:  | NONE   | RW    | RW   | RW | RW | RW  | RW  | RW   | RW  | RES  | RW  | RW  | RW  | RW   | RW   |
- * -----------------------------------------------------------------------------------------------------------
- * SPI_TX:
- * BITS:   | 31:0   |
- * FIELDS: | TXDATA |
- * PERMS:  | RW     |
- * -----------------------------------------------------------------------------------------------------------
- * SPI_RX:
- * BITS:   | 31:0   |
- * FIELDS: | RXDATA |
- * PERMS:  | RW     |
- * -----------------------------------------------------------------------------------------------------------
-*/
-module apb4_spi #(
-    parameter int SPI_NSS_NUM = 4
-) (
-    // verilog_format: off
-    apb4_if.slave                  apb4,
-    // verilog_format: on
-    output                         spi_sck_o,
-    output logic [SPI_NSS_NUM-1:0] spi_nss_o,
-    output logic                   spi_miso_o,
-    input logic                    spi_mosi_i,
-    output logic                   irq_o
+module apb4_spi (
+    apb4_if.slave apb4,
+    spi_if.dut    spi
 );
 
   logic [3:0] s_apb4_addr;
