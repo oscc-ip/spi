@@ -2,10 +2,10 @@
 
 ## Features
 * Compatible with Motorola SPI standard
-* Standard SPI support only
+* Standard SPI mode only
 * Max 4 slave device select
 * Programmable prescaler
-    * max division factor is up to 2^8
+    * max division factor is up to 2^16
 * MSB or LSB bit transmission order
 * Hardware or Software NSS configuration
 * 8, 16, 24 or 32 bits data transmission size
