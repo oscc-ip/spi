@@ -4,7 +4,7 @@
       <img src="https://img.shields.io/badge/RTL%20dev-in%20progress-silver?style=flat-square">
     </a>
     <a href=".">
-      <img src="https://img.shields.io/badge/VCS%20sim-no%20start-wheat?style=flat-square">
+      <img src="https://img.shields.io/badge/VCS%20sim-in%20progress-silver?style=flat-square">
     </a>
     <a href=".">
       <img src="https://img.shields.io/badge/FPGA%20verif-no%20start-wheat?style=flat-square">
@@ -16,6 +16,7 @@
 
 ## Features
 * Compatible with Motorola SPI standard
+* Full duplex serial data transmission
 * Standard SPI mode only
 * Max 4 slave device select
 * Programmable prescaler
