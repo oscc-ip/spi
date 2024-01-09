@@ -1,4 +1,18 @@
 # SPI
+<p>
+    <a href=".">
+      <img src="https://img.shields.io/badge/RTL%20dev-in%20progress-orange?style=flat-square">
+    </a>
+    <a href=".">
+      <img src="https://img.shields.io/badge/VCS%20sim-no%20start-wheat?style=flat-square">
+    </a>
+    <a href=".">
+      <img src="https://img.shields.io/badge/FPGA%20verif-no%20start-wheat?style=flat-square">
+    </a>
+    <a href=".">
+      <img src="https://img.shields.io/badge/Tapeout%20test-no%20start-wheat?style=flat-square">
+    </a>
+</p>
 
 ## Features
 * Compatible with Motorola SPI standard
