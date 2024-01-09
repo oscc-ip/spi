@@ -59,11 +59,14 @@
 `define SPI_RXR_ADDR   {26'b0, `SPI_RXR,   2'b00}
 `define SPI_STAT_ADDR  {26'b0, `SPI_STAT,  2'b00}
 
+`define SPI_DATA_NUM 32
+`define SPI_DATA_BIT_WIDTH $clog2(`SPI_DATA_NUM)
+
 `define SPI_CTRL1_WIDTH 8
 `define SPI_CTRL2_WIDTH 8
 `define SPI_DIV_WIDTH   16
-`define SPI_TXR_WIDTH   32
-`define SPI_RXR_WIDTH   32
+`define SPI_TXR_WIDTH   `SPI_DATA_NUM
+`define SPI_RXR_WIDTH   `SPI_DATA_NUM
 `define SPI_STAT_WIDTH  3
 
 `define SPI_NSS_NUM 1
