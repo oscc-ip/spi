@@ -28,11 +28,8 @@ module spi_clkgen (
   logic [`SPI_DIV_WIDTH-1:0] s_cnt_d, s_cnt_q;
   logic s_cnt_en;
   logic s_spi_clk_d, s_spi_clk_q;
-  logic s_spi_clk_en;
   logic s_spi_pos_edge_d, s_spi_pos_edge_q;
-  logic s_spi_pos_edge_en;
   logic s_spi_neg_edge_d, s_spi_neg_edge_q;
-  logic s_spi_neg_edge_ne;
 
   logic s_is_zero, s_is_one;
 
@@ -50,41 +47,34 @@ module spi_clkgen (
       s_cnt_q
   );
 
-
-  assgin s_spi_clk_en = ~en_i || (en_i && s_is_zero && ~last_i);
   always_comb begin
     s_spi_clk_d = s_spi_clk_q;
     if (~en_i) begin
-      s_spi_clk_d = cpol;
+      s_spi_clk_d = cpol_i;
     end else if (en_i && s_is_zero && ~last_i) begin
       s_spi_clk_d = ~s_spi_clk_q;
     end
   end
-  dffer #(1) u_spi_clk_dffer (
+  dffr #(1) u_spi_clk_dffr (
       clk_i,
       rst_n_i,
-      s_spi_clk_en,
       s_spi_clk_d,
       s_spi_clk_q
   );
 
 
-  assign s_spi_pos_edge_en = en_i && ~s_spi_clk_q && s_is_one;
-  assign s_spi_pos_edge_d  = s_spi_pos_edge_en;
-  dffer #(1) u_spi_pos_edge_dffer (
+  assign s_spi_pos_edge_d = en_i && ~s_spi_clk_q && s_is_one;
+  dffr #(1) u_spi_pos_edge_dffr (
       clk_i,
       rst_n_i,
-      s_spi_pos_edge_en,
       s_spi_pos_edge_d,
       s_spi_pos_edge_q
   );
 
-  assign s_spi_neg_edge_en = en_i && s_spi_clk_q && s_is_one;
-  assign s_spi_neg_edge_d  = s_spi_neg_edge_en;
-  dffer #(1) u_spi_neg_edge_dffer (
+  assign s_spi_neg_edge_d = en_i && s_spi_clk_q && s_is_one;
+  dffr #(1) u_spi_neg_edge_dffr (
       clk_i,
       rst_n_i,
-      s_spi_neg_edge_ne,
       s_spi_neg_edge_d,
       s_spi_neg_edge_q
   );

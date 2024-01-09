@@ -30,12 +30,14 @@ module apb4_spi #(
   logic s_spi_div_en;
   logic [`SPI_STAT_WIDTH-1:0] s_spi_stat_d, s_spi_stat_q;
   logic s_spi_stat_en;
-
+  // bit
   logic s_bit_cpha, s_bit_cpol, s_bit_lsb, s_bit_ass, s_bit_rdm, s_bit_sstr;
   logic [1:0] s_bit_dtb;
   logic s_bit_txie, s_bit_rxie, s_bit_en, s_bit_st;
   logic [3:0] s_bit_nss;
   logic s_bit_txif, s_bit_rxif, s_bit_busy;
+  // irq
+  logic s_busy, s_tx_irq_trg, s_rx_irq_trg;
   // fifo
   logic s_tx_push_valid, s_tx_push_ready, s_tx_empty, s_tx_full, s_tx_pop_valid, s_tx_pop_ready;
   logic s_rx_push_valid, s_rx_push_ready, s_rx_empty, s_rx_full, s_rx_pop_valid, s_rx_pop_ready;
@@ -63,9 +65,11 @@ module apb4_spi #(
   assign s_bit_st        = s_spi_ctrl2_q[3];
   assign s_bit_nss       = s_spi_ctrl2_q[7:4];
 
-  assign s_spi_stat_q[0] = s_bit_txif;
-  assign s_spi_stat_q[1] = s_bit_rxif;
-  assign s_spi_stat_q[2] = s_bit_busy;
+  // assign s_bit_txif      = 1'b0;  // TODO:
+  // assign s_bit_rxif      = 1'b0;  // TODO:
+  assign s_bit_txif      = s_spi_stat_q[0];
+  assign s_bit_rxif      = s_spi_stat_q[1];
+  assign s_bit_busy      = s_spi_stat_q[2];
   assign irq_o           = s_bit_txif | s_bit_rxif;
 
   assign s_spi_ctrl1_en  = s_apb4_wr_hdshk && s_apb4_addr == `SPI_CTRL1 && ~s_bit_busy;
@@ -99,7 +103,7 @@ module apb4_spi #(
   );
 
   always_comb begin
-    s_tx_push_valid = 1'0;
+    s_tx_push_valid = 1'b0;
     s_tx_push_data  = '0;
     if (s_apb4_wr_hdshk && s_apb4_addr == `SPI_TXR) begin
       s_tx_push_valid = 1'b1;
@@ -118,11 +122,11 @@ module apb4_spi #(
   always_comb begin
     s_spi_stat_d = s_spi_stat_q;
     if ((s_bit_txif || s_bit_rxif) && s_apb4_rd_hdshk && s_apb4_addr == `SPI_STAT) begin
-      s_spi_stat_d = {s_bit_busy, 2'b0};
+      s_spi_stat_d = {s_busy, 2'b0};
     end else if (~s_bit_txif && s_bit_en && s_bit_txie && s_tx_irq_trg) begin
-      s_spi_stat_d = {s_bit_busy, s_bit_rxif, 1'b1};
+      s_spi_stat_d = {s_busy, s_bit_rxif, 1'b1};
     end else if (~s_bit_rxif && s_bit_en && s_bit_rxie && s_rx_irq_trg) begin
-      s_spi_stat_d = {s_bit_busy, 1'b1, s_bit_txif};
+      s_spi_stat_d = {s_busy, 1'b1, s_bit_txif};
     end else if (1'b0) begin  // TODO: busy flag
       s_spi_stat_d = {1'b0, s_bit_rxif, s_bit_txif};
     end
@@ -141,7 +145,7 @@ module apb4_spi #(
   };
   always_comb begin
     apb4.prdata    = '0;
-    s_rx_pop_ready = 1'0;
+    s_rx_pop_ready = 1'b0;
     if (s_apb4_rd_hdshk) begin
       unique case (s_apb4_addr)
         `SPI_CTRL1: apb4.prdata[`SPI_CTRL1_WIDTH-1:0] = s_spi_ctrl1_q;
@@ -218,11 +222,17 @@ module apb4_spi #(
       .cpol_i    (s_bit_cpol),
       .cpha_i    (s_bit_cpha),
       .dtb_i     (s_bit_dtb),
-      .busy_o    (s_bit_busy),
+      .busy_o    (s_busy),
       .last_o    (s_last),
+      .tx_valid_i(s_tx_pop_valid),
+      .tx_ready_o(s_tx_pop_ready),
+      .tx_data_i (s_tx_pop_data),
+      .rx_valid_o(s_rx_push_valid),
+      .rx_ready_i(s_rx_push_ready),
+      .rx_data_o (s_rx_push_data),
       .spi_clk_i (spi.spi_sck_o),
-      .spi_mosi_i(spi.spi_mosi_o),
-      .spi_miso_o(spi.spi_miso_i)
+      .spi_mosi_o(spi.spi_mosi_o),
+      .spi_miso_i(spi.spi_miso_i)
   );
 
 endmodule

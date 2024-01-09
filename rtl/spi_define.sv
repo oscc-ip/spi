@@ -59,14 +59,14 @@
 `define SPI_RXR_ADDR   {26'b0, `SPI_RXR,   2'b00}
 `define SPI_STAT_ADDR  {26'b0, `SPI_STAT,  2'b00}
 
-`define SPI_DATA_NUM 32
-`define SPI_DATA_BIT_WIDTH $clog2(`SPI_DATA_NUM)
+`define SPI_DATA_WIDTH 32
+`define SPI_DATA_BIT_WIDTH $clog2(`SPI_DATA_WIDTH)
 
 `define SPI_CTRL1_WIDTH 8
 `define SPI_CTRL2_WIDTH 8
 `define SPI_DIV_WIDTH   16
-`define SPI_TXR_WIDTH   `SPI_DATA_NUM
-`define SPI_RXR_WIDTH   `SPI_DATA_NUM
+`define SPI_TXR_WIDTH   `SPI_DATA_WIDTH
+`define SPI_RXR_WIDTH   `SPI_DATA_WIDTH
 `define SPI_STAT_WIDTH  3
 
 `define SPI_NSS_NUM 1
@@ -76,15 +76,15 @@
 interface spi_if ();
   logic                    spi_sck_o;
   logic [`SPI_NSS_NUM-1:0] spi_nss_o;
-  logic                    spi_miso_o;
-  logic                    spi_mosi_i;
+  logic                    spi_mosi_o;
+  logic                    spi_miso_i;
   logic                    irq_o;
 
   modport dut(
       output spi_sck_o,
       output spi_nss_o,
-      output spi_miso_o,
-      input spi_mosi_i,
+      output spi_mosi_o,
+      input spi_miso_i,
       output irq_o
   );
 
@@ -92,8 +92,8 @@ interface spi_if ();
   modport tb(
       input spi_sck_o,
       input spi_nss_o,
-      input spi_miso_o,
-      output spi_mosi_i,
+      input spi_mosi_o,
+      output spi_miso_i,
       input irq_o
   );
   // verilog_format: on
