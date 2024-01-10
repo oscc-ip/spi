@@ -38,6 +38,7 @@ program automatic test_top (
     spi_hdl.init();
     spi_hdl.test_reset_reg();
     spi_hdl.test_wr_rd_reg();
+    spi_hdl.test_send();
     // spi_hdl.test_clk_div();
     // spi_hdl.test_inc_cnt();
     // spi_hdl.test_pwm();

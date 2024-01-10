@@ -23,6 +23,7 @@ class SPITest extends APB4Master;
   extern function new(string name = "spi_test", virtual apb4_if.master apb4, virtual spi_if.tb spi);
   extern task automatic test_reset_reg();
   extern task automatic test_wr_rd_reg(input bit [31:0] run_times = 1000);
+  extern task automatic test_send();
   extern task automatic test_clk_div(input bit [31:0] run_times = 10);
   extern task automatic test_inc_cnt(input bit [31:0] run_times = 10);
   extern task automatic test_pwm(input bit [31:0] run_times = 1000);
@@ -40,14 +41,9 @@ endfunction
 task automatic SPITest::test_reset_reg();
   super.test_reset_reg();
   // verilog_format: off
-  // this.rd_check(`PWM_CTRL_ADDR, "CTRL REG", 32'b0 & {`PWM_CTRL_WIDTH{1'b1}}, Helper::EQUL, Helper::INFO);
-  // this.rd_check(`PWM_PSCR_ADDR, "PSCR REG", 32'd2 & {`PWM_PSCR_WIDTH{1'b1}}, Helper::EQUL, Helper::INFO);
-  // this.rd_check(`PWM_CMP_ADDR, "CMP REG", 32'b0 & {`PWM_CMP_WIDTH{1'b1}}, Helper::EQUL, Helper::INFO);
-  // this.rd_check(`PWM_CR0_ADDR, "CR0 REG", 32'b0 & {`PWM_CRX_WIDTH{1'b1}}, Helper::EQUL, Helper::INFO);
-  // this.rd_check(`PWM_CR1_ADDR, "CR1 REG", 32'b0 & {`PWM_CRX_WIDTH{1'b1}}, Helper::EQUL, Helper::INFO);
-  // this.rd_check(`PWM_CR2_ADDR, "CR2 REG", 32'b0 & {`PWM_CRX_WIDTH{1'b1}}, Helper::EQUL, Helper::INFO);
-  // this.rd_check(`PWM_CR3_ADDR, "CR3 REG", 32'b0 & {`PWM_CRX_WIDTH{1'b1}}, Helper::EQUL, Helper::INFO);
-  // this.rd_check(`PWM_STAT_ADDR, "STAT REG", 32'b0 & {`PWM_STAT_WIDTH{1'b1}}, Helper::EQUL, Helper::INFO);
+  this.rd_check(`SPI_CTRL1_ADDR, "CTRL1 REG", 32'b0 & {`SPI_CTRL1_WIDTH{1'b1}}, Helper::EQUL, Helper::INFO);
+  this.rd_check(`SPI_CTRL2_ADDR, "CTRL2 REG", 32'b0 & {`SPI_CTRL2_WIDTH{1'b1}}, Helper::EQUL, Helper::INFO);
+  this.rd_check(`SPI_DIV_ADDR, "DIV REG", 32'b0 & {`SPI_DIV_WIDTH{1'b1}}, Helper::EQUL, Helper::INFO);
   // verilog_format: on
 endtask
 
@@ -55,19 +51,28 @@ task automatic SPITest::test_wr_rd_reg(input bit [31:0] run_times = 1000);
   super.test_wr_rd_reg();
   // verilog_format: off
   for (int i = 0; i < run_times; i++) begin
-    // this.wr_rd_check(`PWM_CTRL_ADDR, "CTRL REG", $random & {`PWM_CTRL_WIDTH{1'b1}}, Helper::EQUL);
-    // this.wr_rd_check(`PWM_CMP_ADDR, "CMP REG", $random & {`PWM_CMP_WIDTH{1'b1}}, Helper::EQUL);
-    // this.wr_rd_check(`PWM_CR0_ADDR, "CR0 REG", $random & {`PWM_CRX_WIDTH{1'b1}}, Helper::EQUL);
-    // this.wr_rd_check(`PWM_CR1_ADDR, "CR1 REG", $random & {`PWM_CRX_WIDTH{1'b1}}, Helper::EQUL);
-    // this.wr_rd_check(`PWM_CR2_ADDR, "CR2 REG", $random & {`PWM_CRX_WIDTH{1'b1}}, Helper::EQUL);
-    // this.wr_rd_check(`PWM_CR3_ADDR, "CR3 REG", $random & {`PWM_CRX_WIDTH{1'b1}}, Helper::EQUL);
+      this.wr_rd_check(`SPI_CTRL1_ADDR, "CTRL1 REG", $random & {`SPI_CTRL1_WIDTH{1'b1}}, Helper::EQUL);
+      // this.wr_rd_check(`SPI_CTRL2_ADDR, "CTRL2 REG", $random & {`SPI_CTRL2_WIDTH{1'b1}}, Helper::EQUL);
+      this.wr_rd_check(`SPI_DIV_ADDR, "DIV REG", $random & {`SPI_DIV_WIDTH{1'b1}}, Helper::EQUL);
   end
   // verilog_format: on
 endtask
 
+task automatic SPITest::test_send();
+  $display("=== [test spi send] ===");
+  repeat (200 * 3) @(posedge this.apb4.pclk);
+  // this.write(`SPI_DIV_ADDR, 32'b0 & {`SPI_DIV_WIDTH{1'b1}});
+  this.write(`SPI_DIV_ADDR, 32'd0 & {`SPI_DIV_WIDTH{1'b1}});
+  this.write(`SPI_CTRL1_ADDR, 32'b0000_1000 & {`SPI_CTRL1_WIDTH{1'b1}});
+  this.write(`SPI_CTRL2_ADDR, 32'b0001_0100 & {`SPI_CTRL2_WIDTH{1'b1}});
+  repeat (200) @(posedge this.apb4.pclk);
+  this.write(`SPI_TXR_ADDR, 32'h12);
+  this.write(`SPI_CTRL2_ADDR, 32'b0001_1100 & {`SPI_CTRL2_WIDTH{1'b1}});
+endtask
+
 task automatic SPITest::test_clk_div(input bit [31:0] run_times = 10);
   $display("=== [test spi clk div] ===");
-  // this.write(`PWM_CTRL_ADDR, 32'b100 & {`PWM_CTRL_WIDTH{1'b1}});  // clear cnt
+  // this.write(`SPI_CTRL1_ADDR, 32'b100 & {`SPI_CTRL1_WIDTH{1'b1}});  // clear cnt
   // this.write(`PWM_CR0_ADDR, 32'b0 & {`PWM_CRX_WIDTH{1'b1}});
   // this.write(`PWM_CR1_ADDR, 32'b0 & {`PWM_CRX_WIDTH{1'b1}});
   // this.write(`PWM_CR2_ADDR, 32'b0 & {`PWM_CRX_WIDTH{1'b1}});
@@ -76,51 +81,51 @@ task automatic SPITest::test_clk_div(input bit [31:0] run_times = 10);
 
 
   // repeat (200) @(posedge this.apb4.pclk);
-  // this.write(`PWM_CTRL_ADDR, 32'b0 & {`PWM_CTRL_WIDTH{1'b1}});
+  // this.write(`SPI_CTRL1_ADDR, 32'b0 & {`SPI_CTRL1_WIDTH{1'b1}});
   // repeat (200) @(posedge this.apb4.pclk);
   // this.write(`PWM_PSCR_ADDR, 32'd10 & {`PWM_PSCR_WIDTH{1'b1}});
   // repeat (200) @(posedge this.apb4.pclk);
   // this.write(`PWM_PSCR_ADDR, 32'd4 & {`PWM_PSCR_WIDTH{1'b1}});
   // repeat (200) @(posedge this.apb4.pclk);
   // for (int i = 0; i < run_times; i++) begin
-    // this.wr_val = ($random % 20) & {`PWM_PSCR_WIDTH{1'b1}};
-    // if (this.wr_val < 2) this.wr_val = 2;
-    // if (this.wr_val % 2) this.wr_val -= 1;
-    // this.wr_rd_check(`PWM_PSCR_ADDR, "PSCR REG", this.wr_val, Helper::EQUL);
-    // repeat (200) @(posedge this.apb4.pclk);
+  // this.wr_val = ($random % 20) & {`PWM_PSCR_WIDTH{1'b1}};
+  // if (this.wr_val < 2) this.wr_val = 2;
+  // if (this.wr_val % 2) this.wr_val -= 1;
+  // this.wr_rd_check(`PWM_PSCR_ADDR, "PSCR REG", this.wr_val, Helper::EQUL);
+  // repeat (200) @(posedge this.apb4.pclk);
   // end
 endtask
 
 task automatic SPITest::test_inc_cnt(input bit [31:0] run_times = 10);
   $display("=== [test spi inc cnt] ===");
-  // this.write(`PWM_CTRL_ADDR, 32'b100 & {`PWM_CTRL_WIDTH{1'b1}});  // clear cnt
+  // this.write(`SPI_CTRL1_ADDR, 32'b100 & {`SPI_CTRL1_WIDTH{1'b1}});  // clear cnt
   // this.write(`PWM_CR0_ADDR, 32'b0 & {`PWM_CRX_WIDTH{1'b1}});
   // this.write(`PWM_CR1_ADDR, 32'b0 & {`PWM_CRX_WIDTH{1'b1}});
   // this.write(`PWM_CR2_ADDR, 32'b0 & {`PWM_CRX_WIDTH{1'b1}});
   // this.write(`PWM_CR3_ADDR, 32'b0 & {`PWM_CRX_WIDTH{1'b1}});
   // this.read(`PWM_STAT_ADDR);  // clear the irq
 
-  // this.write(`PWM_CTRL_ADDR, 32'b0 & {`PWM_CTRL_WIDTH{1'b1}});
+  // this.write(`SPI_CTRL1_ADDR, 32'b0 & {`SPI_CTRL1_WIDTH{1'b1}});
   // this.write(`PWM_PSCR_ADDR, 32'd4 & {`PWM_PSCR_WIDTH{1'b1}});
   // this.write(`PWM_CMP_ADDR, 32'hF & {`PWM_CMP_WIDTH{1'b1}});
-  // this.write(`PWM_CTRL_ADDR, 32'b10 & {`PWM_CTRL_WIDTH{1'b1}});
+  // this.write(`SPI_CTRL1_ADDR, 32'b10 & {`SPI_CTRL1_WIDTH{1'b1}});
   // repeat (200) @(posedge this.apb4.pclk);
 endtask
 
 task automatic SPITest::test_pwm(input bit [31:0] run_times = 1000);
   $display("=== [test spi func] ===");
   // servo motor: 50Hz, 1~30KHz, example: 1MHz
-  // this.write(`PWM_CTRL_ADDR, 32'b100 & {`PWM_CTRL_WIDTH{1'b1}});  // clear cnt
+  // this.write(`SPI_CTRL1_ADDR, 32'b100 & {`SPI_CTRL1_WIDTH{1'b1}});  // clear cnt
   // this.write(`PWM_CR0_ADDR, 32'b0 & {`PWM_CRX_WIDTH{1'b1}});
   // this.write(`PWM_CR1_ADDR, 32'b0 & {`PWM_CRX_WIDTH{1'b1}});
   // this.write(`PWM_CR2_ADDR, 32'b0 & {`PWM_CRX_WIDTH{1'b1}});
   // this.write(`PWM_CR3_ADDR, 32'b0 & {`PWM_CRX_WIDTH{1'b1}});
   // this.read(`PWM_STAT_ADDR);  // clear the irq
 
-  // this.write(`PWM_CTRL_ADDR, 32'b0 & {`PWM_CTRL_WIDTH{1'b1}});
+  // this.write(`SPI_CTRL1_ADDR, 32'b0 & {`SPI_CTRL1_WIDTH{1'b1}});
   // this.write(`PWM_PSCR_ADDR, 32'd10 & {`PWM_PSCR_WIDTH{1'b1}});
   // this.write(`PWM_CMP_ADDR, 32'd10 & {`PWM_CMP_WIDTH{1'b1}});  // freq: 100K
-  // this.write(`PWM_CTRL_ADDR, 32'b10 & {`PWM_CTRL_WIDTH{1'b1}});
+  // this.write(`SPI_CTRL1_ADDR, 32'b10 & {`SPI_CTRL1_WIDTH{1'b1}});
   // // CR: [0, CMP-1] -> [10% ~ 100%]
   // this.write(`PWM_CR0_ADDR, 32'd0 & {`PWM_CRX_WIDTH{1'b1}});  // 100% duty
   // this.write(`PWM_CR1_ADDR, 32'd3 & {`PWM_CRX_WIDTH{1'b1}});  // 70% duty
@@ -132,22 +137,22 @@ endtask
 
 task automatic SPITest::test_irq(input bit [31:0] run_times = 10);
   super.test_irq();
-  // this.write(`PWM_CTRL_ADDR, 32'b100 & {`PWM_CTRL_WIDTH{1'b1}});  // clear cnt
+  // this.write(`SPI_CTRL1_ADDR, 32'b100 & {`SPI_CTRL1_WIDTH{1'b1}});  // clear cnt
   // this.write(`PWM_CR0_ADDR, 32'b0 & {`PWM_CRX_WIDTH{1'b1}});
   // this.write(`PWM_CR1_ADDR, 32'b0 & {`PWM_CRX_WIDTH{1'b1}});
   // this.write(`PWM_CR2_ADDR, 32'b0 & {`PWM_CRX_WIDTH{1'b1}});
   // this.write(`PWM_CR3_ADDR, 32'b0 & {`PWM_CRX_WIDTH{1'b1}});
   // this.read(`PWM_STAT_ADDR);  // clear the irq
 
-  // this.write(`PWM_CTRL_ADDR, 32'b0 & {`PWM_CTRL_WIDTH{1'b1}});
+  // this.write(`SPI_CTRL1_ADDR, 32'b0 & {`SPI_CTRL1_WIDTH{1'b1}});
   // this.write(`PWM_PSCR_ADDR, 32'd4 & {`PWM_PSCR_WIDTH{1'b1}});
   // this.write(`PWM_CMP_ADDR, 32'hE & {`PWM_CMP_WIDTH{1'b1}});
 
   // for (int i = 0; i < run_times; i++) begin
-  //   this.write(`PWM_CTRL_ADDR, 32'b0 & {`PWM_CTRL_WIDTH{1'b1}});
+  //   this.write(`SPI_CTRL1_ADDR, 32'b0 & {`SPI_CTRL1_WIDTH{1'b1}});
   //   this.read(`PWM_STAT_ADDR);
   //   $display("%t rd_data: %h", $time, super.rd_data);
-  //   this.write(`PWM_CTRL_ADDR, 32'b11 & {`PWM_CTRL_WIDTH{1'b1}});
+  //   this.write(`SPI_CTRL1_ADDR, 32'b11 & {`SPI_CTRL1_WIDTH{1'b1}});
   //   @(this.spi.irq_o);
   //   repeat (200) @(posedge this.apb4.pclk);
   // end
