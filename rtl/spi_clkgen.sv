@@ -26,23 +26,21 @@ module spi_clkgen (
 );
 
   logic [`SPI_DIV_WIDTH-1:0] s_cnt_d, s_cnt_q;
-  logic s_cnt_en;
   logic s_spi_clk_d, s_spi_clk_q;
   logic s_spi_pos_edge_d, s_spi_pos_edge_q;
   logic s_spi_neg_edge_d, s_spi_neg_edge_q;
-
   logic s_is_zero, s_is_one;
 
-  assign s_is_zero = s_cnt_q == '0;
-  assign s_is_one  = s_cnt_q == {{(`SPI_DIV_WIDTH - 1) {1'b0}}, 1'b1};
-  assign clk_o     = s_spi_clk_q;
+  assign s_is_zero  = s_cnt_q == '0;
+  assign s_is_one   = s_cnt_q == {{(`SPI_DIV_WIDTH - 1) {1'b0}}, 1'b1};
+  assign clk_o      = s_spi_clk_q;
+  assign pos_edge_o = s_spi_pos_edge_q;
+  assign neg_edge_o = s_spi_neg_edge_q;
 
-  assign s_cnt_en  = ~en_i || s_is_zero;
-  assign s_cnt_d   = s_cnt_en ? clk_div_i : s_cnt_q - 1'b1;
-  dfferh #(`SPI_DIV_WIDTH) u_cnt_dfferh (
+  assign s_cnt_d    = (~en_i || s_is_zero) ? clk_div_i : s_cnt_q - 1'b1;
+  dffrh #(`SPI_DIV_WIDTH) u_cnt_dffrh (
       clk_i,
       rst_n_i,
-      s_cnt_en,
       s_cnt_d,
       s_cnt_q
   );
@@ -51,7 +49,7 @@ module spi_clkgen (
     s_spi_clk_d = s_spi_clk_q;
     if (~en_i) begin
       s_spi_clk_d = cpol_i;
-    end else if (en_i && s_is_zero && ~last_i) begin
+    end else if (en_i && s_is_zero && (~last_i || (s_spi_clk_q ^ cpol_i))) begin
       s_spi_clk_d = ~s_spi_clk_q;
     end
   end
@@ -63,7 +61,8 @@ module spi_clkgen (
   );
 
 
-  assign s_spi_pos_edge_d = en_i && ~s_spi_clk_q && s_is_one;
+  // clk_div_i == 0 : 2-div need to do special judge
+  assign s_spi_pos_edge_d = (en_i && ~s_spi_clk_q && s_is_one) || (clk_div_i == '0 && (s_spi_clk_q || (~en_i && st_i)));
   dffr #(1) u_spi_pos_edge_dffr (
       clk_i,
       rst_n_i,
@@ -71,7 +70,7 @@ module spi_clkgen (
       s_spi_pos_edge_q
   );
 
-  assign s_spi_neg_edge_d = en_i && s_spi_clk_q && s_is_one;
+  assign s_spi_neg_edge_d = (en_i && s_spi_clk_q && s_is_one) || (clk_div_i == '0 && (~s_spi_clk_q || (~en_i && st_i)));
   dffr #(1) u_spi_neg_edge_dffr (
       clk_i,
       rst_n_i,
