@@ -28,41 +28,41 @@ module spi_core (
     output logic                       rx_valid_o,
     input  logic                       rx_ready_i,
     output logic [`SPI_DATA_WIDTH-1:0] rx_data_o,
-    input                              spi_clk_i,
-    input                              spi_mosi_o,
-    input                              spi_miso_i
+    input  logic                       spi_clk_i,
+    output logic                       spi_mosi_o,
+    input  logic                       spi_miso_i
 );
 
-  logic [`SPI_DATA_BIT_WIDTH:0] s_tran_cnt_d, s_tran_cnt_q, s_tx_idx, s_rx_idx;
-  logic s_busy_d, s_busy_q;
-  logic s_mosi_d, s_mosi_q;
+  logic [`SPI_DATA_BIT_WIDTH+1:0] s_tran_cnt_d, s_tran_cnt_q, s_tx_idx, s_rx_idx;
   logic [`SPI_DATA_WIDTH-1:0] s_tx_data_d, s_tx_data_q;
   logic s_tx_data_en;
   logic [`SPI_DATA_WIDTH-1:0] s_rx_data_d, s_rx_data_q;
+  logic s_busy_d, s_busy_q;
+  logic s_mosi_d, s_mosi_q;
   logic s_rx_data_en;
   logic s_tx_clk, s_rx_clk;
 
-
-  assign busy_o   = s_busy_q;
-  assign last_o   = ~(|s_tran_cnt_q);
+  assign busy_o = s_busy_q;
+  assign last_o = ~(|s_tran_cnt_q);
+  assign spi_mosi_o = s_mosi_q;
   assign s_tx_idx = lsb_i ? 1'b0 : s_tran_cnt_q - 1'b1;
-  assign s_rx_idx = lsb_i ? 1'b0 : 1'b1;  // TODO:
+  assign s_rx_idx = lsb_i ? 1'b0 : s_tran_cnt_q - 1'b1;  // NOTE: some err
 
-
+  // cpol == 0: pos edge is eariler than neg edge
   always_comb begin
     s_tran_cnt_d = s_tran_cnt_q;
     if (busy_o) begin
-      s_tran_cnt_d = pos_edge_i ? (s_tran_cnt_q - 1'b1) : s_tran_cnt_q;
+      s_tran_cnt_d = (~cpol_i & pos_edge_i) || (cpol_i & neg_edge_i) ? (s_tran_cnt_q - 1'b1) : s_tran_cnt_q;
     end else begin
       unique case (dtb_i)
-        2'b00: s_tran_cnt_d = {1'b0, 5'd7};
-        2'b01: s_tran_cnt_d = {1'b0, 5'd15};
-        2'b10: s_tran_cnt_d = {1'b0, 5'd23};
-        2'b11: s_tran_cnt_d = {1'b0, 5'd31};
+        2'b00: s_tran_cnt_d = {1'b0, 6'd8};
+        2'b01: s_tran_cnt_d = {1'b0, 6'd16};
+        2'b10: s_tran_cnt_d = {1'b0, 6'd24};
+        2'b11: s_tran_cnt_d = {1'b0, 6'd32};
       endcase
     end
   end
-  dffr #(`SPI_DATA_BIT_WIDTH + 1) u_tran_cnt_dffr (
+  dffr #(`SPI_DATA_BIT_WIDTH + 2) u_tran_cnt_dffr (
       clk_i,
       rst_n_i,
       s_tran_cnt_d,
@@ -74,7 +74,7 @@ module spi_core (
     if (~s_busy_q && st_i) begin
       s_busy_d = 1'b1;
     end else if (s_busy_q && last_o && pos_edge_i) begin
-      s_busy_d = 1'b0;  // NOTE: some error? pos_edge 
+      s_busy_d = 1'b0;  // NOTE: some error? pos_edge
     end
   end
   dffr #(1) u_busy_dffr (
