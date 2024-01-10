@@ -66,7 +66,7 @@ task automatic SPITest::test_send();
   this.write(`SPI_CTRL1_ADDR, 32'b0000_1000 & {`SPI_CTRL1_WIDTH{1'b1}});
   this.write(`SPI_CTRL2_ADDR, 32'b0001_0100 & {`SPI_CTRL2_WIDTH{1'b1}});
   repeat (200) @(posedge this.apb4.pclk);
-  this.write(`SPI_TXR_ADDR, 32'h12);
+  this.write(`SPI_TXR_ADDR, 32'h23);
   this.write(`SPI_CTRL2_ADDR, 32'b0001_1100 & {`SPI_CTRL2_WIDTH{1'b1}});
 endtask
 

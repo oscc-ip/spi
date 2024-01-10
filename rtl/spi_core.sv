@@ -40,19 +40,23 @@ module spi_core (
   logic s_busy_d, s_busy_q;
   logic s_mosi_d, s_mosi_q;
   logic s_rx_data_en;
-  logic s_tx_clk, s_rx_clk;
+  logic s_tx_trg, s_rx_trg;
 
   assign busy_o = s_busy_q;
   assign last_o = ~(|s_tran_cnt_q);
   assign spi_mosi_o = s_mosi_q;
-  assign s_tx_idx = lsb_i ? 1'b0 : s_tran_cnt_q - 1'b1;
-  assign s_rx_idx = lsb_i ? 1'b0 : s_tran_cnt_q - 1'b1;  // NOTE: some err
+  assign s_tx_trg = (cpha_i ? pos_edge_i : neg_edge_i) && ~last_o;
+  assign s_tx_idx = lsb_i ? 1'b0 : (s_tran_cnt_q > '0 ? s_tran_cnt_q - 1'b1 : s_tran_cnt_q);
+  assign s_rx_idx = lsb_i ? 1'b0 : s_tran_cnt_q - 1'b1;  // TODO: some err
 
-  // cpol == 0: pos edge is eariler than neg edge
   always_comb begin
     s_tran_cnt_d = s_tran_cnt_q;
     if (busy_o) begin
-      s_tran_cnt_d = (~cpol_i & pos_edge_i) || (cpol_i & neg_edge_i) ? (s_tran_cnt_q - 1'b1) : s_tran_cnt_q;
+      if (s_tran_cnt_q == '0) begin
+        s_tran_cnt_d = s_tran_cnt_q;
+      end else if ((~cpol_i & pos_edge_i) || (cpol_i & neg_edge_i)) begin
+        s_tran_cnt_d = s_tran_cnt_q - 1'b1;
+      end
     end else begin
       unique case (dtb_i)
         2'b00: s_tran_cnt_d = {1'b0, 6'd8};
@@ -85,7 +89,7 @@ module spi_core (
   );
 
   // tx
-  assign s_mosi_d = (s_tx_clk || ~busy_o) ? s_tx_data_q[s_tx_idx[`SPI_DATA_BIT_WIDTH-1:0]] : s_mosi_q;
+  assign s_mosi_d = (s_tx_trg || ~busy_o) ? s_tx_data_q[s_tx_idx[`SPI_DATA_BIT_WIDTH:0]] : s_mosi_q;
   dffr #(1) u_mosi_dffr (
       clk_i,
       rst_n_i,
@@ -93,7 +97,7 @@ module spi_core (
       s_mosi_q
   );
 
-  // tx fifo
+  // get data from tx fifo
   assign tx_ready_o   = ~busy_o;
   assign s_tx_data_en = tx_valid_i && tx_ready_o;
   assign s_tx_data_d  = s_tx_data_en ? tx_data_i : s_tx_data_q;
@@ -105,7 +109,7 @@ module spi_core (
       s_tx_data_q
   );
 
-  assign s_rx_data_en = s_rx_clk || ~busy_o;
+  assign s_rx_data_en = s_rx_trg || ~busy_o;
   assign s_rx_data_d  = s_rx_data_en ? {s_rx_data_q[`SPI_DATA_WIDTH-2:0], spi_miso_i} : s_rx_data_q;
   dffer #(`SPI_DATA_WIDTH) u_rx_dat_dffer (
       clk_i,
@@ -115,7 +119,7 @@ module spi_core (
       s_rx_data_q
   );
 
-  // rx fifo
-  assign rx_valid_o = 1'b1;
+  // put data to rx fifo
+  assign rx_valid_o = 1'b1;  // TODO:
   assign rx_data_o  = (rx_valid_o && rx_ready_i) ? s_rx_data_q : '0;
 endmodule
