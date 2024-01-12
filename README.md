@@ -25,10 +25,12 @@
 * Hardware or Software NSS configuration
 * 8, 16, 24 or 32 bits data transmission size
 * All CPOL and CPHA mode support
+* Programmable dummay and delay cycles configuration
 * Independent send and receive FIFO
     * 16~64 data depth
     * empty or no-emtpy status flag
 * Maskable send or receive interrupt
+* Programmable interrupt watermark
 * Static synchronous design
 * Full synthesizable
 
