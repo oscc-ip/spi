@@ -24,6 +24,7 @@
 * MSB or LSB bit transmission order
 * Hardware or Software NSS configuration
 * 8, 16, 24 or 32 bits data transmission size
+* 1~65536 transmission length with hardware NSS
 * All CPOL and CPHA mode support
 * Programmable dummay and delay cycles configuration
 * Independent send and receive FIFO
