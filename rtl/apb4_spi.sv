@@ -72,6 +72,7 @@ module apb4_spi #(
   assign s_bit_rxif      = s_spi_stat_q[1];
   assign s_bit_busy      = s_spi_stat_q[2];
 
+  // software nss ctrl is more flexible
   assign s_nss_model_sel = (s_bit_nss & {4{s_busy & s_bit_ass}}) | (s_bit_nss & {4{~s_bit_ass}});
   assign spi.spi_nss_o   = ~s_nss_model_sel[`SPI_NSS_NUM-1:0];
   assign spi.irq_o       = s_bit_txif | s_bit_rxif;
@@ -179,7 +180,6 @@ module apb4_spi #(
       .en_i      (s_busy),
       .st_i      (s_bit_st),
       .cpol_i    (s_bit_cpol),
-      .cpha_i    (s_bit_cpha),
       .clk_div_i (s_spi_div_q),
       .last_i    (s_last),
       .clk_o     (spi.spi_sck_o),

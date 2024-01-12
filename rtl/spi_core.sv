@@ -8,6 +8,7 @@
 // MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
+`include "shift_reg.sv"
 `include "spi_define.sv"
 
 module spi_core (
@@ -42,12 +43,10 @@ module spi_core (
   logic s_rx_data_en;
   logic s_tx_trg, s_rx_trg;
 
-  assign busy_o = s_busy_q;
-  assign last_o = ~(|s_tran_cnt_q);
-  assign spi_mosi_o = s_mosi_q;
-  assign s_tx_trg = (cpha_i ? pos_edge_i : neg_edge_i) && ~last_o;
-  assign s_tx_idx = lsb_i ? 1'b0 : (s_tran_cnt_q > '0 ? s_tran_cnt_q - 1'b1 : s_tran_cnt_q);
-  assign s_rx_idx = lsb_i ? 1'b0 : s_tran_cnt_q - 1'b1;  // TODO: some err
+  assign busy_o   = s_busy_q;
+  assign last_o   = ~(|s_tran_cnt_q);
+  assign s_tx_trg = (cpol_i ^ cpha_i ? pos_edge_i : neg_edge_i) && ~last_o;
+  // assign s_rx_idx = lsb_i ? 1'b0 : s_tran_cnt_q - 1'b1;  // TODO: some err
 
   always_comb begin
     s_tran_cnt_d = s_tran_cnt_q;
@@ -88,38 +87,23 @@ module spi_core (
       s_busy_q
   );
 
-  // tx
-  assign s_mosi_d = (s_tx_trg || ~busy_o) ? s_tx_data_q[s_tx_idx[`SPI_DATA_BIT_WIDTH:0]] : s_mosi_q;
-  dffr #(1) u_mosi_dffr (
-      clk_i,
-      rst_n_i,
-      s_mosi_d,
-      s_mosi_q
+  // par to ser
+  assign tx_ready_o = ~busy_o;
+  shift_reg #(8) u_tx_shift8_reg (
+      .clk_i(clk_i),
+      .rst_n_i(rst_n_i),
+      .type_i(`SHIFT_REG_TYPE_LOGIC),
+      .dir_i({1'b0, lsb_i}),
+      .ld_en_i(tx_valid_i && tx_ready_o),
+      .sft_en_i(s_tx_trg),
+      .ser_dat_i(1'b0),
+      .par_data_i(tx_data_i[7:0]),
+      .ser_dat_o(spi_mosi_o),
+      .par_data_o()
   );
 
-  // get data from tx fifo
-  assign tx_ready_o   = ~busy_o;
-  assign s_tx_data_en = tx_valid_i && tx_ready_o;
-  assign s_tx_data_d  = s_tx_data_en ? tx_data_i : s_tx_data_q;
-  dffer #(`SPI_DATA_WIDTH) u_tx_data_dffer (
-      clk_i,
-      rst_n_i,
-      s_tx_data_en,
-      s_tx_data_d,
-      s_tx_data_q
-  );
-
-  assign s_rx_data_en = s_rx_trg || ~busy_o;
-  assign s_rx_data_d  = s_rx_data_en ? {s_rx_data_q[`SPI_DATA_WIDTH-2:0], spi_miso_i} : s_rx_data_q;
-  dffer #(`SPI_DATA_WIDTH) u_rx_dat_dffer (
-      clk_i,
-      rst_n_i,
-      s_rx_data_en,
-      s_rx_data_d,
-      s_rx_data_q
-  );
 
   // put data to rx fifo
   assign rx_valid_o = 1'b1;  // TODO:
-  assign rx_data_o  = (rx_valid_o && rx_ready_i) ? s_rx_data_q : '0;
+  assign rx_data_o  = (rx_valid_o && rx_ready_i) ? '1 : '0;
 endmodule
