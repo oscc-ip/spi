@@ -17,7 +17,6 @@ module spi_clkgen (
     input  logic                      en_i,
     input  logic                      st_i,
     input  logic                      cpol_i,
-    input  logic                      cpha_i,
     input  logic [`SPI_DIV_WIDTH-1:0] clk_div_i,
     input  logic                      last_i,
     output logic                      clk_o,
@@ -62,7 +61,17 @@ module spi_clkgen (
 
 
   // clk_div_i == 0 : 2-div need to do special judge
-  assign s_spi_pos_edge_d = (en_i && ~s_spi_clk_q && s_is_one) || (clk_div_i == '0 && (s_spi_clk_q || (~en_i && st_i)));
+  always_comb begin
+    s_spi_pos_edge_d = '0;
+    if (en_i && ~s_spi_clk_q && s_is_one) begin
+    end else if (clk_div_i == '0) begin
+      if (~cpol_i) begin
+        s_spi_pos_edge_d = (s_spi_clk_q || (~en_i && st_i)) && ~last_i;
+      end else begin
+        s_spi_pos_edge_d = s_spi_clk_q && en_i && ~last_i;
+      end
+    end
+  end
   dffr #(1) u_spi_pos_edge_dffr (
       clk_i,
       rst_n_i,
@@ -70,7 +79,18 @@ module spi_clkgen (
       s_spi_pos_edge_q
   );
 
-  assign s_spi_neg_edge_d = (en_i && s_spi_clk_q && s_is_one) || (clk_div_i == '0 && (~s_spi_clk_q || (~en_i && st_i)));
+  always_comb begin
+    s_spi_neg_edge_d = '0;
+    if (en_i && s_spi_clk_q && s_is_one) begin
+      s_spi_neg_edge_d = 1'b1;
+    end else if (clk_div_i == '0) begin
+      if (cpol_i) begin
+        s_spi_neg_edge_d = (~s_spi_clk_q || (~en_i && st_i)) && ~last_i;
+      end else begin
+        s_spi_neg_edge_d = ~s_spi_clk_q && en_i && ~last_i;
+      end
+    end
+  end
   dffr #(1) u_spi_neg_edge_dffr (
       clk_i,
       rst_n_i,
