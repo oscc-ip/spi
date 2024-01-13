@@ -42,6 +42,7 @@ module spi_core (
   logic s_mosi_d, s_mosi_q;
   logic s_rx_data_en;
   logic s_tx_trg, s_rx_trg;
+  logic s_spi_mosi_8b_o, s_spi_mosi_16b_o, s_spi_mosi_24b_o, s_spi_mosi_32b_o;
 
   assign busy_o   = s_busy_q;
   assign last_o   = ~(|s_tran_cnt_q);
@@ -87,7 +88,15 @@ module spi_core (
       s_busy_q
   );
 
-  // par to ser
+  always_comb begin
+    unique case (dtb_i)
+      `SPI_TRANS_8_BITS:  spi_mosi_o = s_spi_mosi_8b_o;
+      `SPI_TRANS_16_BITS: spi_mosi_o = s_spi_mosi_16b_o;
+      `SPI_TRANS_24_BITS: spi_mosi_o = s_spi_mosi_24b_o;
+      `SPI_TRANS_32_BITS: spi_mosi_o = s_spi_mosi_32b_o;
+    endcase
+  end
+
   assign tx_ready_o = ~busy_o;
   shift_reg #(8) u_tx_shift8_reg (
       .clk_i(clk_i),
@@ -98,10 +107,48 @@ module spi_core (
       .sft_en_i(s_tx_trg),
       .ser_dat_i(1'b0),
       .par_data_i(tx_data_i[7:0]),
-      .ser_dat_o(spi_mosi_o),
+      .ser_dat_o(s_spi_mosi_8b_o),
       .par_data_o()
   );
 
+  shift_reg #(16) u_tx_shift16_reg (
+      .clk_i(clk_i),
+      .rst_n_i(rst_n_i),
+      .type_i(`SHIFT_REG_TYPE_LOGIC),
+      .dir_i({1'b0, lsb_i}),
+      .ld_en_i(tx_valid_i && tx_ready_o),
+      .sft_en_i(s_tx_trg),
+      .ser_dat_i(1'b0),
+      .par_data_i(tx_data_i[15:0]),
+      .ser_dat_o(s_spi_mosi_16b_o),
+      .par_data_o()
+  );
+
+  shift_reg #(24) u_tx_shift24_reg (
+      .clk_i(clk_i),
+      .rst_n_i(rst_n_i),
+      .type_i(`SHIFT_REG_TYPE_LOGIC),
+      .dir_i({1'b0, lsb_i}),
+      .ld_en_i(tx_valid_i && tx_ready_o),
+      .sft_en_i(s_tx_trg),
+      .ser_dat_i(1'b0),
+      .par_data_i(tx_data_i[23:0]),
+      .ser_dat_o(s_spi_mosi_24b_o),
+      .par_data_o()
+  );
+
+  shift_reg #(32) u_tx_shift32_reg (
+      .clk_i(clk_i),
+      .rst_n_i(rst_n_i),
+      .type_i(`SHIFT_REG_TYPE_LOGIC),
+      .dir_i({1'b0, lsb_i}),
+      .ld_en_i(tx_valid_i && tx_ready_o),
+      .sft_en_i(s_tx_trg),
+      .ser_dat_i(1'b0),
+      .par_data_i(tx_data_i[31:0]),
+      .ser_dat_o(s_spi_mosi_32b_o),
+      .par_data_o()
+  );
 
   // put data to rx fifo
   assign rx_valid_o = 1'b1;  // TODO:

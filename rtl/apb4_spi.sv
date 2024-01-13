@@ -34,7 +34,7 @@ module apb4_spi #(
   logic s_bit_cpha, s_bit_cpol, s_bit_lsb, s_bit_ass, s_bit_rdm, s_bit_sstr;
   logic [1:0] s_bit_dtb;
   logic s_bit_txie, s_bit_rxie, s_bit_en, s_bit_st;
-  logic [3:0] s_bit_nss;
+  logic [3:0] s_bit_nss, s_bit_csv;
   logic s_bit_txif, s_bit_rxif, s_bit_busy;
   // irq
   logic s_busy, s_tx_irq_trg, s_rx_irq_trg;
@@ -45,7 +45,7 @@ module apb4_spi #(
   logic [LOG_FIFO_DEPTH:0] s_tx_elem, s_rx_elem;
   // spi
   logic s_last, s_pos_edge, s_neg_edge;
-  logic [3:0] s_nss_model_sel;
+  logic [3:0] s_nss_sel;
 
   assign s_apb4_addr     = apb4.paddr[5:2];
   assign s_apb4_wr_hdshk = apb4.psel && apb4.penable && apb4.pwrite;
@@ -65,6 +65,7 @@ module apb4_spi #(
   assign s_bit_en        = s_spi_ctrl2_q[2];
   assign s_bit_st        = s_spi_ctrl2_q[3];
   assign s_bit_nss       = s_spi_ctrl2_q[7:4];
+  assign s_bit_csv       = s_spi_ctrl2_q[11:8];
 
   // assign s_bit_txif      = 1'b0;  // TODO:
   // assign s_bit_rxif      = 1'b0;  // TODO:
@@ -73,8 +74,8 @@ module apb4_spi #(
   assign s_bit_busy      = s_spi_stat_q[2];
 
   // software nss ctrl is more flexible
-  assign s_nss_model_sel = (s_bit_nss & {4{s_busy & s_bit_ass}}) | (s_bit_nss & {4{~s_bit_ass}});
-  assign spi.spi_nss_o   = ~s_nss_model_sel[`SPI_NSS_NUM-1:0];
+  assign s_nss_sel       = (s_bit_nss & {4{s_busy & s_bit_ass}}) | (s_bit_nss & {4{~s_bit_ass}});
+  assign spi.spi_nss_o   = ~(s_nss_sel[`SPI_NSS_NUM-1:0] ^ s_bit_csv[`SPI_NSS_NUM-1:0]);
   assign spi.irq_o       = s_bit_txif | s_bit_rxif;
 
   assign s_spi_ctrl1_en  = s_apb4_wr_hdshk && s_apb4_addr == `SPI_CTRL1 && ~s_busy;
@@ -120,10 +121,10 @@ module apb4_spi #(
     if (s_apb4_wr_hdshk && s_apb4_addr == `SPI_TXR) begin
       s_tx_push_valid = 1'b1;
       unique case (s_bit_dtb)
-        2'b00: s_tx_push_data = apb4.pwdata[7:0];
-        2'b01: s_tx_push_data = apb4.pwdata[15:0];
-        2'b10: s_tx_push_data = apb4.pwdata[23:0];
-        2'b11: s_tx_push_data = apb4.pwdata[31:0];
+        `SPI_TRANS_8_BITS:  s_tx_push_data = apb4.pwdata[7:0];
+        `SPI_TRANS_16_BITS: s_tx_push_data = apb4.pwdata[15:0];
+        `SPI_TRANS_24_BITS: s_tx_push_data = apb4.pwdata[23:0];
+        `SPI_TRANS_32_BITS: s_tx_push_data = apb4.pwdata[31:0];
       endcase
     end
   end
@@ -222,7 +223,6 @@ module apb4_spi #(
       .empty_o(s_rx_empty),
       .dat_o  (s_rx_pop_data)
   );
-
 
   spi_core u_spi_core (
       .clk_i     (apb4.pclk),
