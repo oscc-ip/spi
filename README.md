@@ -30,8 +30,7 @@
 * Independent send and receive FIFO
     * 16~64 data depth
     * empty or no-emtpy status flag
-* Maskable send or receive interrupt
-* Programmable interrupt watermark
+* Maskable send or receive interrupt and programmable threshold
 * Static synchronous design
 * Full synthesizable
 
