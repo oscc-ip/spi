@@ -13,15 +13,15 @@
 
 /* register mapping
  * SPI_CTRL1:
- * BITS:   | 31:8 | 7:6 | 5    | 4   | 3   | 2   | 1    | 0    |
- * FIELDS: | RES  | DTB | SSTR | RDM | ASS | LSB | CPOL | CPHA |
- * PERMS:  | NONE | RW  | RW   | RW  | RW  | RW  | RW   | RW   |
- * --------------------------------------------------------------
-* SPI_CTRL2:
+ * BITS:   | 31:18 | 17:13 | 12:8 | 7:6 | 5    | 4   | 3   | 2   | 1    | 0    |
+ * FIELDS: | RES   | RXTH  | TXTH | DTB | SSTR | RDM | ASS | LSB | CPOL | CPHA |
+ * PERMS:  | NONE  | RW    | RW   | RW  | RW   | RW  | RW  | RW  | RW   | RW   |
+ * -----------------------------------------------------------------------------
+ * SPI_CTRL2:
  * BITS:   | 31:12 | 11:8 | 7:4 | 3  | 2  | 1    | 0    |
  * FIELDS: | RES   | CSV  | NSS | ST | EN | RXIE | TXIE |
  * PERMS:  | NONE  | RW   | RW  | RW | RW | RW   | RW   |
- * --------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  * SPI_DIV:
  * BITS:   | 31:16 | 15:0 |
  * FIELDS: | RES   | DIV  |
@@ -43,9 +43,9 @@
  * PERMS:  | R      |
  * ---------------------------------------------------------------
  * SPI_STAT:
- * BITS:   | 31:3 | 2    | 1    | 0    |
- * FIELDS: | RES  | BUSY | RXIF | TXIF |
- * PERMS:  | NONE | R    | R    | R    |
+ * BITS:   | 31:5 | 4    | 3    | 2    | 1    | 0    |
+ * FIELDS: | RES  | RETY | TFUL | BUSY | RXIF | TXIF |
+ * PERMS:  | NONE | R    | R    | R    | R    | R    |
  * ---------------------------------------------------------------
 */
 
@@ -69,13 +69,13 @@
 `define SPI_DATA_WIDTH 32
 `define SPI_DATA_BIT_WIDTH $clog2(`SPI_DATA_WIDTH)
 
-`define SPI_CTRL1_WIDTH 8
+`define SPI_CTRL1_WIDTH 18
 `define SPI_CTRL2_WIDTH 12
 `define SPI_DIV_WIDTH   16
 `define SPI_TRL_WIDTH   16
 `define SPI_TXR_WIDTH   `SPI_DATA_WIDTH
 `define SPI_RXR_WIDTH   `SPI_DATA_WIDTH
-`define SPI_STAT_WIDTH  3
+`define SPI_STAT_WIDTH  5
 
 `define SPI_NSS_NUM       1
 `define SPI_TRANS_8_BITS  2'b00

@@ -33,9 +33,10 @@ module apb4_spi #(
   // bit
   logic s_bit_cpha, s_bit_cpol, s_bit_lsb, s_bit_ass, s_bit_rdm, s_bit_sstr;
   logic [1:0] s_bit_dtb;
+  logic [4:0] s_bit_txth, s_bit_rxth;
   logic s_bit_txie, s_bit_rxie, s_bit_en, s_bit_st;
   logic [3:0] s_bit_nss, s_bit_csv;
-  logic s_bit_txif, s_bit_rxif, s_bit_busy;
+  logic s_bit_txif, s_bit_rxif;
   // irq
   logic s_busy, s_tx_irq_trg, s_rx_irq_trg;
   // fifo
@@ -60,6 +61,9 @@ module apb4_spi #(
   assign s_bit_rdm       = s_spi_ctrl1_q[4];
   assign s_bit_sstr      = s_spi_ctrl1_q[5];
   assign s_bit_dtb       = s_spi_ctrl1_q[7:6];
+  assign s_bit_txth      = s_spi_ctrl1_q[12:8];
+  assign s_bit_rxth      = s_spi_ctrl1_q[17:13];
+
   assign s_bit_txie      = s_spi_ctrl2_q[0];
   assign s_bit_rxie      = s_spi_ctrl2_q[1];
   assign s_bit_en        = s_spi_ctrl2_q[2];
@@ -67,14 +71,13 @@ module apb4_spi #(
   assign s_bit_nss       = s_spi_ctrl2_q[7:4];
   assign s_bit_csv       = s_spi_ctrl2_q[11:8];
 
-  // assign s_bit_txif      = 1'b0;  // TODO:
-  // assign s_bit_rxif      = 1'b0;  // TODO:
   assign s_bit_txif      = s_spi_stat_q[0];
   assign s_bit_rxif      = s_spi_stat_q[1];
-  assign s_bit_busy      = s_spi_stat_q[2];
 
   // software nss ctrl is more flexible
   assign s_nss_sel       = (s_bit_nss & {4{s_busy & s_bit_ass}}) | (s_bit_nss & {4{~s_bit_ass}});
+  assign s_tx_irq_trg    = s_bit_txth > s_tx_elem;
+  assign s_rx_irq_trg    = s_bit_rxth < s_rx_elem;
   assign spi.spi_nss_o   = ~(s_nss_sel[`SPI_NSS_NUM-1:0] ^ s_bit_csv[`SPI_NSS_NUM-1:0]);
   assign spi.irq_o       = s_bit_txif | s_bit_rxif;
 
@@ -133,15 +136,17 @@ module apb4_spi #(
                       || (~s_bit_txif && s_bit_en && s_bit_txie && s_tx_irq_trg)
                       || (~s_bit_rxif && s_bit_en && s_bit_rxie && s_rx_irq_trg);
   always_comb begin
-    s_spi_stat_d = s_spi_stat_q;
+    s_spi_stat_d[4] = ~s_rx_pop_valid;
+    s_spi_stat_d[3] = ~s_tx_push_ready;
+    s_spi_stat_d[2] = s_busy;
     if ((s_bit_txif || s_bit_rxif) && s_apb4_rd_hdshk && s_apb4_addr == `SPI_STAT) begin
-      s_spi_stat_d = {s_busy, 2'b0};
+      s_spi_stat_d[1:0] = 2'b0;
     end else if (~s_bit_txif && s_bit_en && s_bit_txie && s_tx_irq_trg) begin
-      s_spi_stat_d = {s_busy, s_bit_rxif, 1'b1};
+      s_spi_stat_d[1:0] = {s_bit_rxif, 1'b1};
     end else if (~s_bit_rxif && s_bit_en && s_bit_rxie && s_rx_irq_trg) begin
-      s_spi_stat_d = {s_busy, 1'b1, s_bit_txif};
-    end else begin  // TODO: busy flag
-      s_spi_stat_d = {s_busy, s_bit_rxif, s_bit_txif};
+      s_spi_stat_d[1:0] = {1'b1, s_bit_txif};
+    end else begin
+      s_spi_stat_d[1:0] = {s_bit_rxif, s_bit_txif};
     end
   end
   dffer #(`SPI_STAT_WIDTH) u_spi_stat_dffer (
@@ -188,7 +193,7 @@ module apb4_spi #(
       .neg_edge_o(s_neg_edge)
   );
 
-  assign s_tx_push_ready = ~s_tx_full;  // no use
+  assign s_tx_push_ready = ~s_tx_full;
   assign s_tx_pop_valid  = ~s_tx_empty;
   fifo #(
       .DATA_WIDTH  (32),
@@ -207,7 +212,7 @@ module apb4_spi #(
   );
 
   assign s_rx_push_ready = ~s_rx_full;
-  assign s_rx_pop_valid  = ~s_rx_empty;  // no use
+  assign s_rx_pop_valid  = ~s_rx_empty;
   fifo #(
       .DATA_WIDTH  (32),
       .BUFFER_DEPTH(FIFO_DEPTH)
