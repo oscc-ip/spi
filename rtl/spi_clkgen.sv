@@ -14,7 +14,7 @@
 module spi_clkgen (
     input  logic                      clk_i,
     input  logic                      rst_n_i,
-    input  logic                      en_i,
+    input  logic                      busy_i,
     input  logic                      st_i,
     input  logic                      cpol_i,
     input  logic [`SPI_DIV_WIDTH-1:0] clk_div_i,
@@ -36,7 +36,7 @@ module spi_clkgen (
   assign pos_edge_o = s_spi_pos_edge_q;
   assign neg_edge_o = s_spi_neg_edge_q;
 
-  assign s_cnt_d    = (~en_i || s_is_zero) ? clk_div_i : s_cnt_q - 1'b1;
+  assign s_cnt_d    = (~busy_i || s_is_zero) ? clk_div_i : s_cnt_q - 1'b1;
   dffrh #(`SPI_DIV_WIDTH) u_cnt_dffrh (
       clk_i,
       rst_n_i,
@@ -46,9 +46,9 @@ module spi_clkgen (
 
   always_comb begin
     s_spi_clk_d = s_spi_clk_q;
-    if (~en_i) begin
+    if (~busy_i) begin
       s_spi_clk_d = cpol_i;
-    end else if (en_i && s_is_zero && (~last_i || (s_spi_clk_q ^ cpol_i))) begin
+    end else if (busy_i && s_is_zero && (~last_i || (s_spi_clk_q ^ cpol_i))) begin
       s_spi_clk_d = ~s_spi_clk_q;
     end
   end
@@ -63,12 +63,12 @@ module spi_clkgen (
   // clk_div_i == 0 : 2-div need to do special judge
   always_comb begin
     s_spi_pos_edge_d = '0;
-    if (en_i && ~s_spi_clk_q && s_is_one) begin
+    if (busy_i && ~s_spi_clk_q && s_is_one) begin
     end else if (clk_div_i == '0) begin
       if (~cpol_i) begin
-        s_spi_pos_edge_d = (s_spi_clk_q || (~en_i && st_i)) && ~last_i;
+        s_spi_pos_edge_d = (s_spi_clk_q || (~busy_i && st_i)) && ~last_i;
       end else begin
-        s_spi_pos_edge_d = s_spi_clk_q && en_i && ~last_i;
+        s_spi_pos_edge_d = s_spi_clk_q && busy_i && ~last_i;
       end
     end
   end
@@ -81,13 +81,13 @@ module spi_clkgen (
 
   always_comb begin
     s_spi_neg_edge_d = '0;
-    if (en_i && s_spi_clk_q && s_is_one) begin
+    if (busy_i && s_spi_clk_q && s_is_one) begin
       s_spi_neg_edge_d = 1'b1;
     end else if (clk_div_i == '0) begin
       if (cpol_i) begin
-        s_spi_neg_edge_d = (~s_spi_clk_q || (~en_i && st_i)) && ~last_i;
+        s_spi_neg_edge_d = (~s_spi_clk_q || (~busy_i && st_i)) && ~last_i;
       end else begin
-        s_spi_neg_edge_d = ~s_spi_clk_q && en_i && ~last_i;
+        s_spi_neg_edge_d = ~s_spi_clk_q && busy_i && ~last_i;
       end
     end
   end

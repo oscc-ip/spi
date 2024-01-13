@@ -88,12 +88,12 @@ module apb4_spi #(
       s_spi_ctrl1_q
   );
 
-  assign s_spi_ctrl2_en = (s_apb4_wr_hdshk && s_apb4_addr == `SPI_CTRL2 && ~s_busy) || (s_busy && s_last && s_pos_edge);
+  assign s_spi_ctrl2_en = (s_apb4_wr_hdshk && s_apb4_addr == `SPI_CTRL2 && ~s_busy) || (s_busy && s_last);
   always_comb begin
     s_spi_ctrl2_d = s_spi_ctrl2_q;
     if (s_apb4_wr_hdshk && s_apb4_addr == `SPI_CTRL2 && ~s_busy) begin
       s_spi_ctrl2_d = apb4.pwdata[`SPI_CTRL2_WIDTH-1:0];
-    end else if (s_busy && s_last && s_pos_edge) begin
+    end else if (s_busy && s_last) begin
       s_spi_ctrl2_d[3] = 1'b0;
     end
   end
@@ -178,7 +178,7 @@ module apb4_spi #(
   spi_clkgen u_spi_clkgen (
       .clk_i     (apb4.pclk),
       .rst_n_i   (apb4.presetn),
-      .en_i      (s_busy),
+      .busy_i    (s_busy),
       .st_i      (s_bit_st),
       .cpol_i    (s_bit_cpol),
       .clk_div_i (s_spi_div_q),
@@ -225,26 +225,28 @@ module apb4_spi #(
   );
 
   spi_core u_spi_core (
-      .clk_i     (apb4.pclk),
-      .rst_n_i   (apb4.presetn),
-      .lsb_i     (s_bit_lsb),
-      .st_i      (s_bit_st),
-      .pos_edge_i(s_pos_edge),
-      .neg_edge_i(s_neg_edge),
-      .cpol_i    (s_bit_cpol),
-      .cpha_i    (s_bit_cpha),
-      .dtb_i     (s_bit_dtb),
-      .busy_o    (s_busy),
-      .last_o    (s_last),
-      .tx_valid_i(s_tx_pop_valid),
-      .tx_ready_o(s_tx_pop_ready),
-      .tx_data_i (s_tx_pop_data),
-      .rx_valid_o(s_rx_push_valid),
-      .rx_ready_i(s_rx_push_ready),
-      .rx_data_o (s_rx_push_data),
-      .spi_clk_i (spi.spi_sck_o),
-      .spi_mosi_o(spi.spi_mosi_o),
-      .spi_miso_i(spi.spi_miso_i)
+      .clk_i      (apb4.pclk),
+      .rst_n_i    (apb4.presetn),
+      .lsb_i      (s_bit_lsb),
+      .st_i       (s_bit_st),
+      .pos_edge_i (s_pos_edge),
+      .neg_edge_i (s_neg_edge),
+      .cpol_i     (s_bit_cpol),
+      .cpha_i     (s_bit_cpha),
+      .dtb_i      (s_bit_dtb),
+      .trl_valid_i(s_apb4_wr_hdshk && s_apb4_addr == `SPI_TRL),
+      .trl_i      (apb4.pwdata[`SPI_TRL_WIDTH-1:0]),
+      .busy_o     (s_busy),
+      .last_o     (s_last),
+      .tx_valid_i (s_tx_pop_valid),
+      .tx_ready_o (s_tx_pop_ready),
+      .tx_data_i  (s_tx_pop_data),
+      .rx_valid_o (s_rx_push_valid),
+      .rx_ready_i (s_rx_push_ready),
+      .rx_data_o  (s_rx_push_data),
+      .spi_clk_i  (spi.spi_sck_o),
+      .spi_mosi_o (spi.spi_mosi_o),
+      .spi_miso_i (spi.spi_miso_i)
   );
 
 endmodule
