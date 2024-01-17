@@ -46,13 +46,15 @@ module spi_core (
   logic s_busy_d, s_busy_q;
   logic s_mosi_d, s_mosi_q;
   logic s_rx_data_en;
-  logic s_tran_done, s_st_trg, s_tx_trg, s_rx_trg;
-  logic s_spi_mosi_8b_o, s_spi_mosi_16b_o, s_spi_mosi_24b_o, s_spi_mosi_32b_o;
+  logic s_tran_done, s_st_trg, s_data_trg;
+  logic [3:0] s_std_mosi;
+  logic [7:0] s_std_rd_data;
 
-  assign busy_o = s_busy_q;
+
+  assign busy_o      = s_busy_q;
   assign s_tran_done = ~(|s_tran_cnt_q);
-  assign last_o = s_tran_done && ~(|s_trl_q);
-  assign s_tx_trg = (cpol_i ^ cpha_i ? pos_edge_i : neg_edge_i) && ~last_o;
+  assign last_o      = s_tran_done && ~(|s_trl_q);
+  assign s_data_trg  = (cpol_i ^ cpha_i ? pos_edge_i : neg_edge_i) && ~last_o;
 
   always_comb begin
     s_tran_cnt_d = s_tran_cnt_q;
@@ -98,7 +100,7 @@ module spi_core (
     if (~s_busy_q && st_i) begin
       s_busy_d = 1'b1;
     end else if (s_busy_q && last_o) begin
-      s_busy_d = 1'b0;  // NOTE: some error? pos_edge
+      s_busy_d = 1'b0;
     end
   end
   dffr #(1) u_busy_dffr (
@@ -107,16 +109,6 @@ module spi_core (
       s_busy_d,
       s_busy_q
   );
-
-  always_comb begin
-    unique case (dtb_i)
-      `SPI_TRANS_8_BITS:  spi_mosi_o = s_spi_mosi_8b_o;
-      `SPI_TRANS_16_BITS: spi_mosi_o = s_spi_mosi_16b_o;
-      `SPI_TRANS_24_BITS: spi_mosi_o = s_spi_mosi_24b_o;
-      `SPI_TRANS_32_BITS: spi_mosi_o = s_spi_mosi_32b_o;
-    endcase
-  end
-
 
   edge_det_sync_re #(
       .DATA_WIDTH(1)
@@ -127,60 +119,37 @@ module spi_core (
       s_st_trg
   );
 
+  // tx fifo
+  assign spi_mosi_o = s_std_mosi[dtb_i];
   assign tx_ready_o = s_st_trg || s_tran_done;
-  shift_reg #(8) u_tx_shift8_reg (
-      .clk_i(clk_i),
-      .rst_n_i(rst_n_i),
-      .type_i(`SHIFT_REG_TYPE_LOGIC),
-      .dir_i({1'b0, lsb_i}),
-      .ld_en_i(tx_valid_i && tx_ready_o),
-      .sft_en_i(s_tx_trg),
-      .ser_dat_i(1'b0),
-      .par_data_i(tx_data_i[7:0]),
-      .ser_dat_o(s_spi_mosi_8b_o),
-      .par_data_o()
-  );
-
-  shift_reg #(16) u_tx_shift16_reg (
-      .clk_i(clk_i),
-      .rst_n_i(rst_n_i),
-      .type_i(`SHIFT_REG_TYPE_LOGIC),
-      .dir_i({1'b0, lsb_i}),
-      .ld_en_i(tx_valid_i && tx_ready_o),
-      .sft_en_i(s_tx_trg),
-      .ser_dat_i(1'b0),
-      .par_data_i(tx_data_i[15:0]),
-      .ser_dat_o(s_spi_mosi_16b_o),
-      .par_data_o()
-  );
-
-  shift_reg #(24) u_tx_shift24_reg (
-      .clk_i(clk_i),
-      .rst_n_i(rst_n_i),
-      .type_i(`SHIFT_REG_TYPE_LOGIC),
-      .dir_i({1'b0, lsb_i}),
-      .ld_en_i(tx_valid_i && tx_ready_o),
-      .sft_en_i(s_tx_trg),
-      .ser_dat_i(1'b0),
-      .par_data_i(tx_data_i[23:0]),
-      .ser_dat_o(s_spi_mosi_24b_o),
-      .par_data_o()
-  );
-
-  shift_reg #(32) u_tx_shift32_reg (
-      .clk_i(clk_i),
-      .rst_n_i(rst_n_i),
-      .type_i(`SHIFT_REG_TYPE_LOGIC),
-      .dir_i({1'b0, lsb_i}),
-      .ld_en_i(tx_valid_i && tx_ready_o),
-      .sft_en_i(s_tx_trg),
-      .ser_dat_i(1'b0),
-      .par_data_i(tx_data_i[31:0]),
-      .ser_dat_o(s_spi_mosi_32b_o),
-      .par_data_o()
-  );
+  for (genvar i = 1; i <= 4; i++) begin
+    shift_reg #(8 * i) u_tx_shift_reg (
+        .clk_i     (clk_i),
+        .rst_n_i   (rst_n_i),
+        .type_i    (`SHIFT_REG_TYPE_LOGIC),
+        .dir_i     ({1'b0, lsb_i}),
+        .ld_en_i   (tx_valid_i && tx_ready_o),
+        .sft_en_i  (s_data_trg),
+        .ser_dat_i (1'b0),
+        .par_data_i(tx_data_i[8*i-1:0]),
+        .ser_dat_o (s_std_mosi[i-1]),
+        .par_data_o()
+    );
+  end
 
   // put data to rx fifo
-  assign rx_valid_o = 1'b1;  // TODO:
-  assign rx_data_o  = (rx_valid_o && rx_ready_i) ? '1 : '0;
+  assign rx_valid_o = 1'b0;  // TODO:
+  assign rx_data_o  = (rx_valid_o && rx_ready_i) ? s_std_rd_data : '0;
+  shift_reg #(8) u_rx_shift_reg (
+      .clk_i     (clk_i),
+      .rst_n_i   (rst_n_i),
+      .type_i    (`SHIFT_REG_TYPE_LOGIC),
+      .dir_i     ({1'b0, lsb_i}),
+      .ld_en_i   (1'b0),
+      .sft_en_i  (s_data_trg),
+      .ser_dat_i (spi_miso_i),
+      .par_data_i('0),
+      .ser_dat_o (),
+      .par_data_o(s_std_rd_data)
+  );
 endmodule
