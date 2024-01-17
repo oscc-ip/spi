@@ -17,7 +17,7 @@
 ## Features
 * Compatible with Motorola SPI standard
 * Full duplex serial data transmission
-* Standard SPI mode only
+* Standard, dual and quad SPI mode support
 * Max 4 slave device select
 * Programmable prescaler
     * max division factor is up to 2^16
