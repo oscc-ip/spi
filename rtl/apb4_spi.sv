@@ -28,11 +28,13 @@ module apb4_spi #(
   logic s_spi_ctrl2_en;
   logic [`SPI_DIV_WIDTH-1:0] s_spi_div_d, s_spi_div_q;
   logic s_spi_div_en;
+  logic [`SPI_CAL_WIDTH-1:0] s_spi_cal_d, s_spi_cal_q;
+  logic s_spi_cal_en;
   logic [`SPI_STAT_WIDTH-1:0] s_spi_stat_d, s_spi_stat_q;
   logic s_spi_stat_en;
   // bit
   logic s_bit_cpha, s_bit_cpol, s_bit_lsb, s_bit_ass, s_bit_rdm, s_bit_sstr;
-  logic [1:0] s_bit_dtb;
+  logic [1:0] s_bit_tdtb, s_bit_rdtb;
   logic [4:0] s_bit_txth, s_bit_rxth;
   logic s_bit_txie, s_bit_rxie, s_bit_en, s_bit_st;
   logic [3:0] s_bit_nss, s_bit_csv;
@@ -60,9 +62,10 @@ module apb4_spi #(
   assign s_bit_ass       = s_spi_ctrl1_q[3];
   assign s_bit_rdm       = s_spi_ctrl1_q[4];
   assign s_bit_sstr      = s_spi_ctrl1_q[5];
-  assign s_bit_dtb       = s_spi_ctrl1_q[7:6];
-  assign s_bit_txth      = s_spi_ctrl1_q[12:8];
-  assign s_bit_rxth      = s_spi_ctrl1_q[17:13];
+  assign s_bit_tdtb      = s_spi_ctrl1_q[7:6];
+  assign s_bit_rdtb      = s_spi_ctrl1_q[9:8];
+  assign s_bit_txth      = s_spi_ctrl1_q[14:10];
+  assign s_bit_rxth      = s_spi_ctrl1_q[19:15];
 
   assign s_bit_txie      = s_spi_ctrl2_q[0];
   assign s_bit_rxie      = s_spi_ctrl2_q[1];
@@ -118,12 +121,22 @@ module apb4_spi #(
       s_spi_div_q
   );
 
+  assign s_spi_cal_en = s_apb4_wr_hdshk && s_apb4_addr == `SPI_CAL && ~s_busy;
+  assign s_spi_cal_d  = s_spi_cal_en ? apb4.pwdata[`SPI_CAL_WIDTH-1:0] : s_spi_cal_q;
+  dffer #(`SPI_CAL_WIDTH) u_spi_cal_dffer (
+      apb4.pclk,
+      apb4.presetn,
+      s_spi_cal_en,
+      s_spi_cal_d,
+      s_spi_cal_q
+  );
+
   always_comb begin
     s_tx_push_valid = 1'b0;
     s_tx_push_data  = '0;
     if (s_apb4_wr_hdshk && s_apb4_addr == `SPI_TXR) begin
       s_tx_push_valid = 1'b1;
-      unique case (s_bit_dtb)
+      unique case (s_bit_tdtb)
         `SPI_TRANS_8_BITS:  s_tx_push_data = apb4.pwdata[7:0];
         `SPI_TRANS_16_BITS: s_tx_push_data = apb4.pwdata[15:0];
         `SPI_TRANS_24_BITS: s_tx_push_data = apb4.pwdata[23:0];
@@ -169,6 +182,7 @@ module apb4_spi #(
         `SPI_CTRL1: apb4.prdata[`SPI_CTRL1_WIDTH-1:0] = s_spi_ctrl1_q;
         `SPI_CTRL2: apb4.prdata[`SPI_CTRL2_WIDTH-1:0] = s_spi_ctrl2_q;
         `SPI_DIV:   apb4.prdata[`SPI_DIV_WIDTH-1:0] = s_spi_div_q;
+        `SPI_CAL:   apb4.prdata[`SPI_CAL_WIDTH-1:0] = s_spi_cal_q;
         `SPI_RXR: begin
           s_rx_pop_ready                  = 1'b1;
           // NOTE: need to handshake to pop a valid data
@@ -238,7 +252,9 @@ module apb4_spi #(
       .neg_edge_i (s_neg_edge),
       .cpol_i     (s_bit_cpol),
       .cpha_i     (s_bit_cpha),
-      .dtb_i      (s_bit_dtb),
+      .tdtb_i     (s_bit_tdtb),
+      .rdtb_i     (s_bit_rdtb),
+      .cal_i      (s_spi_cal_q),
       .trl_valid_i(s_apb4_wr_hdshk && s_apb4_addr == `SPI_TRL),
       .trl_i      (apb4.pwdata[`SPI_TRL_WIDTH-1:0]),
       .busy_o     (s_busy),

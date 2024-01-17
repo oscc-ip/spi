@@ -21,7 +21,9 @@ module spi_core (
     input  logic                       neg_edge_i,
     input  logic                       cpol_i,
     input  logic                       cpha_i,
-    input  logic [                1:0] dtb_i,
+    input  logic [                1:0] tdtb_i,
+    input  logic [                1:0] rdtb_i,
+    input  logic [ `SPI_CAL_WIDTH-1:0] cal_i,
     input  logic                       trl_valid_i,
     input  logic [ `SPI_TRL_WIDTH-1:0] trl_i,
     output logic                       busy_o,
@@ -47,8 +49,8 @@ module spi_core (
   logic s_mosi_d, s_mosi_q;
   logic s_rx_data_en;
   logic s_tran_done, s_st_trg, s_data_trg;
-  logic [3:0] s_std_mosi;
-  logic [7:0] s_std_rd_data;
+  logic [ 3:0] s_std_mosi;
+  logic [31:0] s_std_rd_data[0:3];
 
 
   assign busy_o      = s_busy_q;
@@ -63,7 +65,7 @@ module spi_core (
         s_tran_cnt_d = s_tran_cnt_q - 1'b1;
       end
     end else begin
-      unique case (dtb_i)
+      unique case (tdtb_i)
         2'b00: s_tran_cnt_d = {1'b0, 6'd8};
         2'b01: s_tran_cnt_d = {1'b0, 6'd16};
         2'b10: s_tran_cnt_d = {1'b0, 6'd24};
@@ -120,7 +122,7 @@ module spi_core (
   );
 
   // tx fifo
-  assign spi_mosi_o = s_std_mosi[dtb_i];
+  assign spi_mosi_o = s_std_mosi[tdtb_i];
   assign tx_ready_o = s_st_trg || s_tran_done;
   for (genvar i = 1; i <= 4; i++) begin
     shift_reg #(8 * i) u_tx_shift_reg (
@@ -138,18 +140,20 @@ module spi_core (
   end
 
   // put data to rx fifo
-  assign rx_valid_o = 1'b0;  // TODO:
-  assign rx_data_o  = (rx_valid_o && rx_ready_i) ? s_std_rd_data : '0;
-  shift_reg #(8) u_rx_shift_reg (
-      .clk_i     (clk_i),
-      .rst_n_i   (rst_n_i),
-      .type_i    (`SHIFT_REG_TYPE_LOGIC),
-      .dir_i     ({1'b0, lsb_i}),
-      .ld_en_i   (1'b0),
-      .sft_en_i  (s_data_trg),
-      .ser_dat_i (spi_miso_i),
-      .par_data_i('0),
-      .ser_dat_o (),
-      .par_data_o(s_std_rd_data)
-  );
+  assign rx_valid_o = s_trl_q <= cal_i;
+  assign rx_data_o  = (rx_valid_o && rx_ready_i) ? s_std_rd_data[rdtb_i] : '0;
+  for (genvar i = 1; i <= 4; i++) begin
+    shift_reg #(8 * i) u_rx_shift_reg (
+        .clk_i     (clk_i),
+        .rst_n_i   (rst_n_i),
+        .type_i    (`SHIFT_REG_TYPE_LOGIC),
+        .dir_i     ({1'b0, lsb_i}),
+        .ld_en_i   (1'b0),
+        .sft_en_i  (s_data_trg),
+        .ser_dat_i (spi_miso_i),
+        .par_data_i('0),
+        .ser_dat_o (),
+        .par_data_o(s_std_rd_data[i-1][8*i-1:0])
+    );
+  end
 endmodule
