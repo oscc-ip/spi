@@ -95,7 +95,6 @@
 `define SPI_TRANS_16_BITS 2'b01
 `define SPI_TRANS_24_BITS 2'b10
 `define SPI_TRANS_32_BITS 2'b11
-
 // verilog_format: on
 
 // io0(mosi)

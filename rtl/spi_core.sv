@@ -49,13 +49,14 @@ module spi_core (
   logic s_busy_d, s_busy_q;
   logic s_mosi_d, s_mosi_q;
   logic s_rx_data_en;
-  logic s_tran_done, s_st_trg, s_data_trg;
+  logic s_tran_done, s_tran_done_fe_trg, s_st_re_trg, s_st_fe_trg, s_tx_trg, s_rx_trg;
   logic [ 3:0] s_std_mosi;
   logic [31:0] s_std_rd_data[0:3];
 
-
+  // rx trg need to delay one cycle
   assign s_tran_done = ~(|s_tran_cnt_q);
-  assign s_data_trg  = (cpol_i ^ cpha_i ? pos_edge_i : neg_edge_i) && ~last_o;
+  assign s_tx_trg    = (cpol_i ^ cpha_i ? pos_edge_i : neg_edge_i) && ~last_o;
+  assign s_rx_trg    = (cpol_i ^ cpha_i ? pos_edge_i : neg_edge_i);
   assign busy_o      = s_busy_q;
   assign last_o      = s_tran_done && ~(|s_trl_q);
 
@@ -92,7 +93,7 @@ module spi_core (
       endcase
     end
   end
-  dffr #(`SPI_DATA_BIT_WIDTH + 2) u_tran_cnt_dffr (
+  dffrh #(`SPI_DATA_BIT_WIDTH + 2) u_tran_cnt_dffrh (
       clk_i,
       rst_n_i,
       s_tran_cnt_d,
@@ -137,20 +138,41 @@ module spi_core (
       clk_i,
       rst_n_i,
       st_i,
-      s_st_trg
+      s_st_re_trg
+  );
+
+  edge_det_sync_fe #(
+      .DATA_WIDTH(1)
+  ) u_st_fe (
+      clk_i,
+      rst_n_i,
+      st_i,
+      s_st_fe_trg
+  );
+
+  edge_det_sync_fe #(
+      .DATA_WIDTH(1)
+  ) u_trand_done_fe (
+      clk_i,
+      rst_n_i,
+      s_tran_done,
+      s_tran_done_fe_trg
   );
 
   // tx fifo
   assign spi_io_out_o[0] = s_std_mosi[tdtb_i];
-  assign tx_ready_o      = s_st_trg || s_tran_done;
+  assign tx_ready_o      = s_st_re_trg || s_tran_done;
   for (genvar i = 1; i <= 4; i++) begin
-    shift_reg #(8 * i) u_tx_shift_reg (
+    shift_reg #(
+        .DATA_WIDTH(8 * i),
+        .SHIFT_NUM (1)
+    ) u_std_spi_tx_shift_reg (
         .clk_i     (clk_i),
         .rst_n_i   (rst_n_i),
         .type_i    (`SHIFT_REG_TYPE_LOGIC),
         .dir_i     ({1'b0, lsb_i}),
         .ld_en_i   (tx_valid_i && tx_ready_o),
-        .sft_en_i  (s_data_trg),
+        .sft_en_i  (s_tx_trg),
         .ser_dat_i (1'b0),
         .par_data_i(tx_data_i[8*i-1:0]),
         .ser_dat_o (s_std_mosi[i-1]),
@@ -158,21 +180,29 @@ module spi_core (
     );
   end
 
-  // put data to rx fifo
-  assign rx_valid_o = s_trl_q <= cal_i && st_i;
+  // put data to rx fifo, delay tran done with one cycle
+  assign rx_valid_o = s_st_fe_trg || (s_trl_q < cal_i && s_tran_done_fe_trg);
   assign rx_data_o  = (rx_valid_o && rx_ready_i) ? s_std_rd_data[rdtb_i] : '0;
   for (genvar i = 1; i <= 4; i++) begin
-    shift_reg #(8 * i) u_rx_shift_reg (
+    shift_reg #(
+        .DATA_WIDTH(8 * i),
+        .SHIFT_NUM (1)
+    ) u_std_spi_rx_shift_reg (
         .clk_i     (clk_i),
         .rst_n_i   (rst_n_i),
-        .type_i    (`SHIFT_REG_TYPE_LOGIC),
+        .type_i    (`SHIFT_REG_TYPE_SERI),
         .dir_i     ({1'b0, lsb_i}),
         .ld_en_i   (1'b0),
-        .sft_en_i  (s_data_trg),
-        .ser_dat_i (spi_io_in_i[1]),
+        .sft_en_i  (s_rx_trg),
+        .ser_dat_i (s_trl_q <= cal_i ? spi_io_in_i[1] : 1'b0),
         .par_data_i('0),
         .ser_dat_o (),
         .par_data_o(s_std_rd_data[i-1][8*i-1:0])
     );
+
+    // fill unused bits
+    if (i <= 3) begin
+      assign s_std_rd_data[i-1][31:8*i] = '0;
+    end
   end
 endmodule
