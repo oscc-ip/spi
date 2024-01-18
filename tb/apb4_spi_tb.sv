@@ -9,11 +9,13 @@
 // See the Mulan PSL v2 for more details.
 
 `include "apb4_if.sv"
+`include "gpio_pad.sv"
 `include "spi_define.sv"
 
 module apb4_spi_tb ();
   localparam CLK_PEROID = 10;
   logic rst_n_i, clk_i;
+  wire [3:0] s_spi_io_pad;
 
   initial begin
     clk_i = 1'b0;
@@ -39,6 +41,16 @@ module apb4_spi_tb ();
 
   spi_if u_spi_if ();
 
+  for (genvar i = 0; i < 4; i++) begin
+    tri_pd_pad_h u_spi_io_pad (
+        .i_i   (u_spi_if.spi_io_out_o[i]),
+        .oen_i (u_spi_if.spi_io_en_o[i]),
+        .ren_i (),
+        .c_o   (u_spi_if.spi_io_in_i[i]),
+        .pad_io(s_spi_io_pad[i])
+    );
+  end
+
   test_top u_test_top (
       .apb4(u_apb4_if.master),
       .spi (u_spi_if.tb)
@@ -48,4 +60,12 @@ module apb4_spi_tb ();
       .spi (u_spi_if.dut)
   );
 
+  W25Q128JVxIM u_W25Q128JVxIM (
+      .CSn  (u_spi_if.spi_nss_o[0]),
+      .CLK  (u_spi_if.spi_sck_o),
+      .DIO  (s_spi_io_pad[0]),
+      .DO   (s_spi_io_pad[1]),
+      .WPn  (s_spi_io_pad[2]),
+      .HOLDn(s_spi_io_pad[3])
+  );
 endmodule

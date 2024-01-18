@@ -23,7 +23,7 @@ program automatic test_top (
     if ($test$plusargs("WAVE_ON")) begin
       $value$plusargs("WAVE_NAME=%s", wave_name);
       $fsdbDumpfile(wave_name);
-      $fsdbDumpvars("+all");
+      $fsdbDumpvars(0, u_apb4_spi);
     end
   endtask
 

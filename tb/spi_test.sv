@@ -44,6 +44,7 @@ task automatic SPITest::test_reset_reg();
   this.rd_check(`SPI_CTRL1_ADDR, "CTRL1 REG", 32'b0 & {`SPI_CTRL1_WIDTH{1'b1}}, Helper::EQUL, Helper::INFO);
   this.rd_check(`SPI_CTRL2_ADDR, "CTRL2 REG", 32'b0 & {`SPI_CTRL2_WIDTH{1'b1}}, Helper::EQUL, Helper::INFO);
   this.rd_check(`SPI_DIV_ADDR, "DIV REG", 32'b0 & {`SPI_DIV_WIDTH{1'b1}}, Helper::EQUL, Helper::INFO);
+  this.rd_check(`SPI_CAL_ADDR, "CAL REG", 32'b0 & {`SPI_CAL_WIDTH{1'b1}}, Helper::EQUL, Helper::INFO);
   // verilog_format: on
 endtask
 
@@ -54,6 +55,7 @@ task automatic SPITest::test_wr_rd_reg(input bit [31:0] run_times = 1000);
       this.wr_rd_check(`SPI_CTRL1_ADDR, "CTRL1 REG", $random & {`SPI_CTRL1_WIDTH{1'b1}}, Helper::EQUL);
       // this.wr_rd_check(`SPI_CTRL2_ADDR, "CTRL2 REG", $random & {`SPI_CTRL2_WIDTH{1'b1}}, Helper::EQUL);
       this.wr_rd_check(`SPI_DIV_ADDR, "DIV REG", $random & {`SPI_DIV_WIDTH{1'b1}}, Helper::EQUL);
+      this.wr_rd_check(`SPI_CAL_ADDR, "CAL REG", $random & {`SPI_CAL_WIDTH{1'b1}}, Helper::EQUL);
   end
   // verilog_format: on
 endtask
@@ -63,11 +65,19 @@ task automatic SPITest::test_send();
   repeat (200 * 3) @(posedge this.apb4.pclk);
   // this.write(`SPI_DIV_ADDR, 32'b0 & {`SPI_DIV_WIDTH{1'b1}});
   this.write(`SPI_DIV_ADDR, 32'd0 & {`SPI_DIV_WIDTH{1'b1}});
-  this.write(`SPI_CTRL1_ADDR, 32'b0000_1000 & {`SPI_CTRL1_WIDTH{1'b1}});
+  this.write(`SPI_CTRL1_ADDR, 32'b11_1100_1000 & {`SPI_CTRL1_WIDTH{1'b1}});
   this.write(`SPI_CTRL2_ADDR, 32'b0001_0100 & {`SPI_CTRL2_WIDTH{1'b1}});
   repeat (200) @(posedge this.apb4.pclk);
-  this.write(`SPI_TXR_ADDR, 32'h23);
+  this.write(`SPI_TXR_ADDR, 32'h0300_0000);
+  this.write(`SPI_TXR_ADDR, 32'b0);
+  this.write(`SPI_CAL_ADDR, 32'd4);
+  this.write(`SPI_TRL_ADDR, 32'd5);
   this.write(`SPI_CTRL2_ADDR, 32'b0001_1100 & {`SPI_CTRL2_WIDTH{1'b1}});
+  repeat (800) @(posedge this.apb4.pclk);
+  for (int i = 0; i < 5; i++) begin
+    this.read(`SPI_RXR_ADDR);
+    $display("%t w25q rd data: %h", $time, super.rd_data);
+  end
 endtask
 
 task automatic SPITest::test_clk_div(input bit [31:0] run_times = 10);
