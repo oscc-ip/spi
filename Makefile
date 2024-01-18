@@ -18,12 +18,14 @@ SRC_FILE += ../rtl/spi_clkgen.sv
 SRC_FILE += ../rtl/spi_core.sv
 SRC_FILE += ../rtl/apb4_spi.sv
 SRC_FILE += ../tb/spi_test.sv
+SRC_FILE += ../model/w25q128jvxim.sv
 SRC_FILE += ../tb/test_top.sv
 SRC_FILE += ../tb/apb4_spi_tb.sv
 
 SIM_INC ?=
 SIM_INC += +incdir+../rtl/
 SIM_INC += +incdir+../../common/rtl/
+SIM_INC += +incdir+../../common/rtl/tech
 SIM_INC += +incdir+../../common/rtl/cdc
 SIM_INC += +incdir+../../common/rtl/verif
 SIM_INC += +incdir+../../common/rtl/interface
