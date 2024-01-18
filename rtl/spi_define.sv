@@ -13,9 +13,9 @@
 
 /* register mapping
  * SPI_CTRL1:
- * BITS:   | 31:20 | 19:15 | 14:10 | 9:8  | 7:6  | 5    | 4   | 3   | 2   | 1    | 0    |
- * FIELDS: | RES   | RXTH  | TXTH  | RDTB | TDTB | SSTR | RDM | ASS | LSB | CPOL | CPHA |
- * PERMS:  | NONE  | RW    | RW    | RW   | RW   | RW   | RW  | RW  | RW  | RW   | RW   |
+ * BITS:   | 31:22 | 21:20 | 19:15 | 14:10 | 9:8  | 7:6  | 5    | 4   | 3   | 2   | 1    | 0    |
+ * FIELDS: | RES   | SPM   | RXTH  | TXTH  | RDTB | TDTB | SSTR | RDM | ASS | LSB | CPOL | CPHA |
+ * PERMS:  | NONE  | RW    | RW    | RW    | RW   | RW   | RW   | RW  | RW  | RW  | RW   | RW   |
  * -----------------------------------------------------------------------------
  * SPI_CTRL2:
  * BITS:   | 31:12 | 11:8 | 7:4 | 3  | 2  | 1    | 0    |
@@ -76,7 +76,7 @@
 `define SPI_DATA_WIDTH 32
 `define SPI_DATA_BIT_WIDTH $clog2(`SPI_DATA_WIDTH)
 
-`define SPI_CTRL1_WIDTH 20
+`define SPI_CTRL1_WIDTH 22
 `define SPI_CTRL2_WIDTH 12
 `define SPI_DIV_WIDTH   16
 `define SPI_CAL_WIDTH   16
@@ -84,6 +84,11 @@
 `define SPI_TXR_WIDTH   `SPI_DATA_WIDTH
 `define SPI_RXR_WIDTH   `SPI_DATA_WIDTH
 `define SPI_STAT_WIDTH  5
+
+`define SPI_STD_SPI  2'b00
+`define SPI_DUAL_SPI 2'b01
+`define SPI_QUAD_SPI 2'b10
+`define SPI_QSPI     2'b11
 
 `define SPI_NSS_NUM       1
 `define SPI_TRANS_8_BITS  2'b00
@@ -93,18 +98,24 @@
 
 // verilog_format: on
 
+// io0(mosi)
+// io1(miso)
+// io2
+// io3
 interface spi_if ();
   logic                    spi_sck_o;
   logic [`SPI_NSS_NUM-1:0] spi_nss_o;
-  logic                    spi_mosi_o;
-  logic                    spi_miso_i;
+  logic [             3:0] spi_io_en_o;
+  logic [             3:0] spi_io_in_i;
+  logic [             3:0] spi_io_out_o;
   logic                    irq_o;
 
   modport dut(
       output spi_sck_o,
       output spi_nss_o,
-      output spi_mosi_o,
-      input spi_miso_i,
+      output spi_io_en_o,
+      input spi_io_in_i,
+      output spi_io_out_o,
       output irq_o
   );
 
@@ -112,8 +123,9 @@ interface spi_if ();
   modport tb(
       input spi_sck_o,
       input spi_nss_o,
-      input spi_mosi_o,
-      output spi_miso_i,
+      input spi_io_en_o,
+      output spi_io_in_i,
+      input spi_io_out_o,
       input irq_o
   );
   // verilog_format: on

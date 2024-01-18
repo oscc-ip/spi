@@ -23,6 +23,7 @@ module spi_core (
     input  logic                       cpha_i,
     input  logic [                1:0] tdtb_i,
     input  logic [                1:0] rdtb_i,
+    input  logic [                1:0] spm_i,
     input  logic [ `SPI_CAL_WIDTH-1:0] cal_i,
     input  logic                       trl_valid_i,
     input  logic [ `SPI_TRL_WIDTH-1:0] trl_i,
@@ -34,9 +35,9 @@ module spi_core (
     output logic                       rx_valid_o,
     input  logic                       rx_ready_i,
     output logic [`SPI_DATA_WIDTH-1:0] rx_data_o,
-    input  logic                       spi_clk_i,
-    output logic                       spi_mosi_o,
-    input  logic                       spi_miso_i
+    output logic [                3:0] spi_io_en_o,
+    input  logic [                3:0] spi_io_in_i,
+    output logic [                3:0] spi_io_out_o
 );
 
   logic [`SPI_DATA_BIT_WIDTH+1:0] s_tran_cnt_d, s_tran_cnt_q;
@@ -53,10 +54,28 @@ module spi_core (
   logic [31:0] s_std_rd_data[0:3];
 
 
-  assign busy_o      = s_busy_q;
   assign s_tran_done = ~(|s_tran_cnt_q);
-  assign last_o      = s_tran_done && ~(|s_trl_q);
   assign s_data_trg  = (cpol_i ^ cpha_i ? pos_edge_i : neg_edge_i) && ~last_o;
+  assign busy_o      = s_busy_q;
+  assign last_o      = s_tran_done && ~(|s_trl_q);
+
+  // spi mode
+  always_comb begin
+    spi_io_en_o = '1;
+    unique case (spm_i)
+      `SPI_STD_SPI: begin
+        spi_io_en_o[0] = 1'b0;
+        spi_io_en_o[1] = 1'b1;
+      end
+      `SPI_DUAL_SPI: begin
+        spi_io_en_o[1:0] = rx_valid_o ? '1 : '0;
+      end
+      `SPI_QUAD_SPI: begin
+        spi_io_en_o[3:0] = rx_valid_o ? '1 : '0;
+      end
+      default: spi_io_en_o = '1;
+    endcase
+  end
 
   always_comb begin
     s_tran_cnt_d = s_tran_cnt_q;
@@ -122,8 +141,8 @@ module spi_core (
   );
 
   // tx fifo
-  assign spi_mosi_o = s_std_mosi[tdtb_i];
-  assign tx_ready_o = s_st_trg || s_tran_done;
+  assign spi_io_out_o[0] = s_std_mosi[tdtb_i];
+  assign tx_ready_o      = s_st_trg || s_tran_done;
   for (genvar i = 1; i <= 4; i++) begin
     shift_reg #(8 * i) u_tx_shift_reg (
         .clk_i     (clk_i),
@@ -140,7 +159,7 @@ module spi_core (
   end
 
   // put data to rx fifo
-  assign rx_valid_o = s_trl_q <= cal_i;
+  assign rx_valid_o = s_trl_q <= cal_i && st_i;
   assign rx_data_o  = (rx_valid_o && rx_ready_i) ? s_std_rd_data[rdtb_i] : '0;
   for (genvar i = 1; i <= 4; i++) begin
     shift_reg #(8 * i) u_rx_shift_reg (
@@ -150,7 +169,7 @@ module spi_core (
         .dir_i     ({1'b0, lsb_i}),
         .ld_en_i   (1'b0),
         .sft_en_i  (s_data_trg),
-        .ser_dat_i (spi_miso_i),
+        .ser_dat_i (spi_io_in_i[1]),
         .par_data_i('0),
         .ser_dat_o (),
         .par_data_o(s_std_rd_data[i-1][8*i-1:0])

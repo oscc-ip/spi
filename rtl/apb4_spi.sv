@@ -34,7 +34,7 @@ module apb4_spi #(
   logic s_spi_stat_en;
   // bit
   logic s_bit_cpha, s_bit_cpol, s_bit_lsb, s_bit_ass, s_bit_rdm, s_bit_sstr;
-  logic [1:0] s_bit_tdtb, s_bit_rdtb;
+  logic [1:0] s_bit_tdtb, s_bit_rdtb, s_bit_spm;
   logic [4:0] s_bit_txth, s_bit_rxth;
   logic s_bit_txie, s_bit_rxie, s_bit_en, s_bit_st;
   logic [3:0] s_bit_nss, s_bit_csv;
@@ -66,6 +66,7 @@ module apb4_spi #(
   assign s_bit_rdtb      = s_spi_ctrl1_q[9:8];
   assign s_bit_txth      = s_spi_ctrl1_q[14:10];
   assign s_bit_rxth      = s_spi_ctrl1_q[19:15];
+  assign s_bit_spm       = s_spi_ctrl1_q[21:20];
 
   assign s_bit_txie      = s_spi_ctrl2_q[0];
   assign s_bit_rxie      = s_spi_ctrl2_q[1];
@@ -244,30 +245,31 @@ module apb4_spi #(
   );
 
   spi_core u_spi_core (
-      .clk_i      (apb4.pclk),
-      .rst_n_i    (apb4.presetn),
-      .lsb_i      (s_bit_lsb),
-      .st_i       (s_bit_st),
-      .pos_edge_i (s_pos_edge),
-      .neg_edge_i (s_neg_edge),
-      .cpol_i     (s_bit_cpol),
-      .cpha_i     (s_bit_cpha),
-      .tdtb_i     (s_bit_tdtb),
-      .rdtb_i     (s_bit_rdtb),
-      .cal_i      (s_spi_cal_q),
-      .trl_valid_i(s_apb4_wr_hdshk && s_apb4_addr == `SPI_TRL),
-      .trl_i      (apb4.pwdata[`SPI_TRL_WIDTH-1:0]),
-      .busy_o     (s_busy),
-      .last_o     (s_last),
-      .tx_valid_i (s_tx_pop_valid),
-      .tx_ready_o (s_tx_pop_ready),
-      .tx_data_i  (s_tx_pop_data),
-      .rx_valid_o (s_rx_push_valid),
-      .rx_ready_i (s_rx_push_ready),
-      .rx_data_o  (s_rx_push_data),
-      .spi_clk_i  (spi.spi_sck_o),
-      .spi_mosi_o (spi.spi_mosi_o),
-      .spi_miso_i (spi.spi_miso_i)
+      .clk_i       (apb4.pclk),
+      .rst_n_i     (apb4.presetn),
+      .lsb_i       (s_bit_lsb),
+      .st_i        (s_bit_st),
+      .pos_edge_i  (s_pos_edge),
+      .neg_edge_i  (s_neg_edge),
+      .cpol_i      (s_bit_cpol),
+      .cpha_i      (s_bit_cpha),
+      .tdtb_i      (s_bit_tdtb),
+      .rdtb_i      (s_bit_rdtb),
+      .spm_i       (s_bit_spm),
+      .cal_i       (s_spi_cal_q),
+      .trl_valid_i (s_apb4_wr_hdshk && s_apb4_addr == `SPI_TRL),
+      .trl_i       (apb4.pwdata[`SPI_TRL_WIDTH-1:0]),
+      .busy_o      (s_busy),
+      .last_o      (s_last),
+      .tx_valid_i  (s_tx_pop_valid),
+      .tx_ready_o  (s_tx_pop_ready),
+      .tx_data_i   (s_tx_pop_data),
+      .rx_valid_o  (s_rx_push_valid),
+      .rx_ready_i  (s_rx_push_ready),
+      .rx_data_o   (s_rx_push_data),
+      .spi_io_en_o (spi.spi_io_en_o),
+      .spi_io_in_i (spi.spi_io_in_i),
+      .spi_io_out_o(spi.spi_io_out_o)
   );
 
 endmodule
