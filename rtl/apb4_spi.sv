@@ -13,7 +13,7 @@
 `include "spi_define.sv"
 
 module apb4_spi #(
-    parameter int FIFO_DEPTH     = 16,
+    parameter int FIFO_DEPTH     = 64,
     parameter int LOG_FIFO_DEPTH = $clog2(FIFO_DEPTH)
 ) (
     apb4_if.slave apb4,
@@ -36,7 +36,7 @@ module apb4_spi #(
   logic s_bit_cpha, s_bit_cpol, s_bit_lsb, s_bit_ass, s_bit_rdm, s_bit_sstr;
   logic [1:0] s_bit_tdtb, s_bit_rdtb, s_bit_spm;
   logic [4:0] s_bit_txth, s_bit_rxth;
-  logic s_bit_txie, s_bit_rxie, s_bit_en, s_bit_st;
+  logic s_bit_txie, s_bit_rxie, s_bit_en, s_bit_st, s_bit_rwm;
   logic [3:0] s_bit_nss, s_bit_csv;
   logic s_bit_txif, s_bit_rxif;
   // irq
@@ -72,8 +72,9 @@ module apb4_spi #(
   assign s_bit_rxie      = s_spi_ctrl2_q[1];
   assign s_bit_en        = s_spi_ctrl2_q[2];
   assign s_bit_st        = s_spi_ctrl2_q[3];
-  assign s_bit_nss       = s_spi_ctrl2_q[7:4];
-  assign s_bit_csv       = s_spi_ctrl2_q[11:8];
+  assign s_bit_rwm       = s_spi_ctrl2_q[4];
+  assign s_bit_nss       = s_spi_ctrl2_q[8:5];
+  assign s_bit_csv       = s_spi_ctrl2_q[12:9];
 
   assign s_bit_txif      = s_spi_stat_q[0];
   assign s_bit_rxif      = s_spi_stat_q[1];
@@ -249,6 +250,7 @@ module apb4_spi #(
       .rst_n_i     (apb4.presetn),
       .lsb_i       (s_bit_lsb),
       .st_i        (s_bit_st),
+      .rwm_i       (s_bit_rwm),
       .pos_edge_i  (s_pos_edge),
       .neg_edge_i  (s_neg_edge),
       .cpol_i      (s_bit_cpol),

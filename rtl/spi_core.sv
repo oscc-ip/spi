@@ -17,6 +17,7 @@ module spi_core (
     input  logic                       rst_n_i,
     input  logic                       lsb_i,
     input  logic                       st_i,
+    input  logic                       rwm_i,
     input  logic                       pos_edge_i,
     input  logic                       neg_edge_i,
     input  logic                       cpol_i,
@@ -181,7 +182,7 @@ module spi_core (
   end
 
   // put data to rx fifo, delay tran done with one cycle
-  assign rx_valid_o = s_st_fe_trg || (s_trl_q < cal_i && s_tran_done_fe_trg);
+  assign rx_valid_o = rwm_i && s_st_fe_trg || (s_trl_q < cal_i && s_tran_done_fe_trg);
   assign rx_data_o  = (rx_valid_o && rx_ready_i) ? s_std_rd_data[rdtb_i] : '0;
   for (genvar i = 1; i <= 4; i++) begin
     shift_reg #(
