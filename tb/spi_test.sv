@@ -15,15 +15,17 @@
 `include "spi_define.sv"
 
 class SPITest extends APB4Master;
-  string                 name;
-  int                    wr_val;
-  virtual apb4_if.master apb4;
-  virtual spi_if.tb      spi;
+  string                                       name;
+  int                                          wr_val;
+  int                                          wr_num;
+  bit                    [`SPI_DATA_WIDTH-1:0] wr_que [$];
+  virtual apb4_if.master                       apb4;
+  virtual spi_if.tb                            spi;
 
   extern function new(string name = "spi_test", virtual apb4_if.master apb4, virtual spi_if.tb spi);
   extern task automatic test_reset_reg();
   extern task automatic test_wr_rd_reg(input bit [31:0] run_times = 1000);
-  extern task automatic test_send();
+  extern task automatic w25q_std_spi_wr_rd_test();
   extern task automatic test_clk_div(input bit [31:0] run_times = 10);
   extern task automatic test_inc_cnt(input bit [31:0] run_times = 10);
   extern task automatic test_pwm(input bit [31:0] run_times = 1000);
@@ -34,6 +36,8 @@ function SPITest::new(string name, virtual apb4_if.master apb4, virtual spi_if.t
   super.new("apb4_master", apb4);
   this.name   = name;
   this.wr_val = 0;
+  this.wr_num = 0;
+  this.wr_que = {};
   this.apb4   = apb4;
   this.spi    = spi;
 endfunction
@@ -60,23 +64,54 @@ task automatic SPITest::test_wr_rd_reg(input bit [31:0] run_times = 1000);
   // verilog_format: on
 endtask
 
-task automatic SPITest::test_send();
-  $display("=== [test spi send] ===");
+task automatic SPITest::w25q_std_spi_wr_rd_test();
+  $display("=== [test std spi wr rd] ===");
+  this.wr_que = {};
+  this.wr_num = 32;
+
+  for (int i = 0; i < 256 / 4; i++) begin
+    this.wr_que.push_back($random);
+  end
+
   repeat (200 * 3) @(posedge this.apb4.pclk);
-  // this.write(`SPI_DIV_ADDR, 32'b0 & {`SPI_DIV_WIDTH{1'b1}});
   this.write(`SPI_DIV_ADDR, 32'd0 & {`SPI_DIV_WIDTH{1'b1}});
+  this.write(`SPI_CTRL1_ADDR, 32'b00_0000_1000 & {`SPI_CTRL1_WIDTH{1'b1}});
+  this.write(`SPI_CTRL2_ADDR, 32'b0010_0100 & {`SPI_CTRL2_WIDTH{1'b1}});
+  repeat (100) @(posedge this.apb4.pclk);
+
+  // write enable
+  this.write(`SPI_TXR_ADDR, 32'h06);
+  this.write(`SPI_CTRL2_ADDR, 32'b0010_1100 & {`SPI_CTRL2_WIDTH{1'b1}});
+  repeat (50) @(posedge this.apb4.pclk);
   this.write(`SPI_CTRL1_ADDR, 32'b11_1100_1000 & {`SPI_CTRL1_WIDTH{1'b1}});
-  this.write(`SPI_CTRL2_ADDR, 32'b0001_0100 & {`SPI_CTRL2_WIDTH{1'b1}});
-  repeat (200) @(posedge this.apb4.pclk);
-  this.write(`SPI_TXR_ADDR, 32'h0300_0000);
-  this.write(`SPI_TXR_ADDR, 32'b0);
-  this.write(`SPI_CAL_ADDR, 32'd4);
-  this.write(`SPI_TRL_ADDR, 32'd5);
-  this.write(`SPI_CTRL2_ADDR, 32'b0001_1100 & {`SPI_CTRL2_WIDTH{1'b1}});
-  repeat (800) @(posedge this.apb4.pclk);
-  for (int i = 0; i < 5; i++) begin
+  this.write(`SPI_TXR_ADDR, 32'h0200_0000);  // write page program
+  // wr data
+  foreach (this.wr_que[i]) begin
+    if (i < this.wr_num) begin
+      this.write(`SPI_TXR_ADDR, this.wr_que[i]);
+    end else begin
+      break;
+    end
+  end
+
+  this.write(`SPI_CAL_ADDR, 32'd0);
+  this.write(`SPI_TRL_ADDR, this.wr_num + 1);
+  this.write(`SPI_CTRL2_ADDR, 32'b0010_1100 & {`SPI_CTRL2_WIDTH{1'b1}});
+  repeat (4000) @(posedge this.apb4.pclk);  // for delay tpp time
+
+  // rd data
+  this.write(`SPI_TXR_ADDR, 32'h0300_0000);  // read data
+  // this.write(`SPI_TXR_ADDR, 32'd0);
+  this.write(`SPI_CAL_ADDR, this.wr_num);
+  this.write(`SPI_TRL_ADDR, this.wr_num + 1);
+  this.write(`SPI_CTRL2_ADDR, 32'b0011_1100 & {`SPI_CTRL2_WIDTH{1'b1}});
+  repeat (400 * this.wr_num) @(posedge this.apb4.pclk);
+
+  for (int i = 0; i < this.wr_num; i++) begin
     this.read(`SPI_RXR_ADDR);
-    $display("%t w25q rd data: %h", $time, super.rd_data);
+    if(super.rd_data != this.wr_que[i]) begin
+      $display("%t unmatch rd data: %h expr data: %h", $time, super.rd_data, this.wr_que[i]);
+    end
   end
 endtask
 

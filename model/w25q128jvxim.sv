@@ -305,7 +305,8 @@ specify
 
     specparam  tHLQZ = 12;
     specparam  tHHQX = 7;
-    specparam  tSUS = 20000;
+    // specparam  tSUS = 20000;
+    specparam  tSUS = 200; // for sim
 
 
     specparam  tCHHL = 5;
@@ -330,7 +331,8 @@ parameter tW =     1000;  // Write Status Register Write Time
 parameter  tRES1 =  30000;   // Release from power down time 1
 parameter tRES2 =  30000;   // Release from power down time 2
 parameter tDP =    3000;   // Time for device to enter deep power down.
-parameter tPP =    700000;  // Page Program Time
+// parameter tPP =    700000;  // Page Program Time
+parameter tPP =    700;  // just for sim
 parameter tSE =    30000000;  // Sector Erase Time.
 parameter  tBE1 =   120000000;  // Block Erase Time. 32KB
 parameter  tBE2 =   150000000;  // Block Erase Time. 64KB
@@ -591,7 +593,9 @@ begin :read_opcode
 
         `CMD_WRITE_ENABLE :
         begin
-            if((!flag_power_down) && (WPn || status_reg[`QE]))
+            // $display("status0: %d %d %d", flag_power_down, WPn, status_reg[`QE]);
+            // if((!flag_power_down) && (WPn || status_reg[`QE]))
+            if(!flag_power_down)
                 status_reg[`WEL] = 1;
         end
 
@@ -737,8 +741,10 @@ begin :read_opcode
 
         `CMD_PAGE_PROGRAM :
         begin
+            // $display("status1: %d %d %d", status_reg[`WEL], !status_reg[`SUS], !flag_power_down);
             if(status_reg[`WEL] && !status_reg[`SUS] && !flag_power_down)
             begin
+                // $display("status");
                 flag_read_op_reg = 1'b0;
                 write_page(0);
             end
@@ -2400,10 +2406,10 @@ task write_page;
     begin
         if(!status_reg[`WIP])
         begin
-
             input_byte(prog_byte_address[23:16]);
             input_byte(prog_byte_address[15:8]);
             input_byte(prog_byte_address[7:0]);
+            // $display("prog address: %h", prog_byte_address);
             if(!write_protected(prog_byte_address))
                 fill_page_latch(quadio,prog_byte_address,0);
         end
@@ -2420,7 +2426,8 @@ task fill_page_latch;
     input flag_secsi;
     integer x;
     integer address;
-
+    
+    // $display("quadio: %d prog_addr: %h flag_secsi: %d", quadio, prog_address, flag_secsi);
     begin
         // Move memory page into page latch
         if(flag_secsi)
@@ -2444,6 +2451,7 @@ task fill_page_latch;
             else
                 input_byte(temp);
             page_latch[prog_address[7:0]] = temp;
+            // $display("temp: %h", temp);
             if(flag_secsi)
                 flag_prog_secsi_page = 1;
             else
