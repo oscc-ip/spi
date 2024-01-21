@@ -53,9 +53,11 @@ module spi_core (
   logic s_rx_data_en, s_par_trg;
   logic s_tran_done, s_tran_done_fe_trg, s_st_re_trg, s_st_fe_trg, s_tx_trg, s_rx_trg;
   logic [ 3:0] s_std_mosi;
-  logic [ 3:0] s_dual_io    [0:1];
-  logic [ 3:0] s_quad_io    [0:3];
-  logic [31:0] s_std_rd_data[0:3];
+  logic [ 3:0] s_dual_io     [0:1];
+  logic [ 3:0] s_quad_io     [0:3];
+  logic [31:0] s_std_rd_data [0:3];
+  logic [31:0] s_dual_rd_data[0:3];
+  logic [31:0] s_quad_rd_data[0:3];
 
   // rx trg need to delay one cycle
   assign s_tran_done = ~(|s_tran_cnt_q);
@@ -132,14 +134,44 @@ module spi_core (
         s_tran_cnt_d = s_tran_cnt_q - 1'b1;
       end
     end else begin
-      if (spm_i != `SPI_STD_SPI && ~s_par_trg) begin
+      // s_tran_done can only mantain one cycle,
+      // (s_ser_cnt_d == snm_i) mean s_par_trg need to set valid advance by one cycle
+      if (spm_i != `SPI_STD_SPI && ~(s_ser_cnt_d == snm_i)) begin
         s_tran_cnt_d = 7'd8;
       end else begin
         unique case (tdtb_i)
-          2'b00: s_tran_cnt_d = 7'd8;
-          2'b01: s_tran_cnt_d = 7'd16;
-          2'b10: s_tran_cnt_d = 7'd24;
-          2'b11: s_tran_cnt_d = 7'd32;
+          `SPI_TRANS_8_BITS: begin
+            unique case (spm_i)
+              `SPI_STD_SPI:  s_tran_cnt_d = 7'd8;
+              `SPI_DUAL_SPI: s_tran_cnt_d = 7'd4;
+              `SPI_QUAD_SPI: s_tran_cnt_d = 7'd2;
+              default:       s_tran_cnt_d = 7'd8;
+            endcase
+          end
+          `SPI_TRANS_16_BITS: begin
+            unique case (spm_i)
+              `SPI_STD_SPI:  s_tran_cnt_d = 7'd16;
+              `SPI_DUAL_SPI: s_tran_cnt_d = 7'd8;
+              `SPI_QUAD_SPI: s_tran_cnt_d = 7'd4;
+              default:       s_tran_cnt_d = 7'd16;
+            endcase
+          end
+          `SPI_TRANS_24_BITS: begin
+            unique case (spm_i)
+              `SPI_STD_SPI:  s_tran_cnt_d = 7'd24;
+              `SPI_DUAL_SPI: s_tran_cnt_d = 7'd12;
+              `SPI_QUAD_SPI: s_tran_cnt_d = 7'd6;
+              default:       s_tran_cnt_d = 7'd24;
+            endcase
+          end
+          `SPI_TRANS_32_BITS: begin
+            unique case (spm_i)
+              `SPI_STD_SPI:  s_tran_cnt_d = 7'd32;
+              `SPI_DUAL_SPI: s_tran_cnt_d = 7'd16;
+              `SPI_QUAD_SPI: s_tran_cnt_d = 7'd8;
+              default:       s_tran_cnt_d = 7'd32;
+            endcase
+          end
         endcase
       end
     end
@@ -210,7 +242,7 @@ module spi_core (
       s_tran_done_fe_trg
   );
 
-  // std spi tx fifo
+  // std spi tx
   assign tx_ready_o = s_st_re_trg || s_tran_done;
   for (genvar i = 1; i <= 4; i++) begin
     shift_reg #(
@@ -230,9 +262,22 @@ module spi_core (
     );
   end
 
+
   // put data to rx fifo, delay tran done with one cycle
   assign rx_valid_o = rwm_i && (s_st_fe_trg || (s_trl_q < cal_i && s_tran_done_fe_trg));
-  assign rx_data_o  = (rx_valid_o && rx_ready_i) ? s_std_rd_data[rdtb_i] : '0;
+  always_comb begin
+    rx_data_o = '0;
+    if (rx_valid_o && rx_ready_i) begin
+      unique case (spm_i)
+        `SPI_STD_SPI:  rx_data_o = s_std_rd_data[rdtb_i];
+        `SPI_DUAL_SPI: rx_data_o = s_dual_rd_data[rdtb_i];
+        `SPI_QUAD_SPI: rx_data_o = s_quad_rd_data[rdtb_i];
+        default:       rx_data_o = '0;
+      endcase
+    end
+  end
+
+  // std spi rx
   for (genvar i = 1; i <= 4; i++) begin
     shift_reg #(
         .DATA_WIDTH(8 * i),
@@ -256,8 +301,27 @@ module spi_core (
     end
   end
 
+  // dual spi rx
+  for (genvar i = 1; i <= 4; i++) begin
+    shift_reg #(
+        .DATA_WIDTH(8 * i),
+        .SHIFT_NUM (2)
+    ) u_dual_spi_rx_shift_reg (
+        .clk_i     (clk_i),
+        .rst_n_i   (rst_n_i),
+        .type_i    (`SHIFT_REG_TYPE_SERI),
+        .dir_i     ({1'b0, lsb_i}),
+        .ld_en_i   (1'b0),
+        .sft_en_i  (s_rx_trg),
+        .ser_dat_i (s_trl_q <= cal_i ? spi_io_in_i[1:0] : '0),
+        .par_data_i('0),
+        .ser_dat_o (),
+        .par_data_o(s_dual_rd_data[i-1][8*i-1:0])
+    );
 
-
-  // dual spi
-
+    // fill unused bits
+    if (i <= 3) begin
+      assign s_dual_rd_data[i-1][31:8*i] = '0;
+    end
+  end
 endmodule
