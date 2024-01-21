@@ -18,9 +18,9 @@
  * PERMS:  | NONE  | RW    | RW    | RW    | RW   | RW   | RW   | RW  | RW  | RW  | RW   | RW   |
  * -----------------------------------------------------------------------------
  * SPI_CTRL2:
- * BITS:   | 31:13 | 12:9 | 8:5 | 4   | 3  | 2  | 1    | 0    |
- * FIELDS: | RES   | CSV  | NSS | RWM | ST | EN | RXIE | TXIE |
- * PERMS:  | NONE  | RW   | RW  | RW  | RW | RW | RW   | RW   |
+ * BITS:   | 31:17 | 16:13 | 12:9 | 8:5 | 4   | 3  | 2  | 1    | 0    |
+ * FIELDS: | RES   | SNM   | CSV  | NSS | RWM | ST | EN | RXIE | TXIE |
+ * PERMS:  | NONE  | RW    | RW   | RW  | RW  | RW | RW | RW   | RW   |
  * -----------------------------------------------------------------------------
  * SPI_DIV:
  * BITS:   | 31:16 | 15:0 |
@@ -77,7 +77,7 @@
 `define SPI_DATA_BIT_WIDTH $clog2(`SPI_DATA_WIDTH)
 
 `define SPI_CTRL1_WIDTH 22
-`define SPI_CTRL2_WIDTH 13
+`define SPI_CTRL2_WIDTH 17
 `define SPI_DIV_WIDTH   16
 `define SPI_CAL_WIDTH   16
 `define SPI_TRL_WIDTH   16

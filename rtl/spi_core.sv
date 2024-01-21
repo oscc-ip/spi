@@ -25,6 +25,7 @@ module spi_core (
     input  logic [                1:0] tdtb_i,
     input  logic [                1:0] rdtb_i,
     input  logic [                1:0] spm_i,
+    input  logic [                3:0] snm_i,
     input  logic [ `SPI_CAL_WIDTH-1:0] cal_i,
     input  logic                       trl_valid_i,
     input  logic [ `SPI_TRL_WIDTH-1:0] trl_i,
@@ -48,8 +49,8 @@ module spi_core (
   logic s_tx_data_en;
   logic [`SPI_DATA_WIDTH-1:0] s_rx_data_d, s_rx_data_q;
   logic s_busy_d, s_busy_q;
-  logic s_mosi_d, s_mosi_q;
-  logic s_rx_data_en;
+  logic [3:0] s_ser_cnt_d, s_ser_cnt_q;
+  logic s_rx_data_en, s_par_trg;
   logic s_tran_done, s_tran_done_fe_trg, s_st_re_trg, s_st_fe_trg, s_tx_trg, s_rx_trg;
   logic [ 3:0] s_std_mosi;
   logic [ 3:0] s_dual_io    [0:1];
@@ -75,14 +76,14 @@ module spi_core (
         if (~rwm_i) begin
           spi_io_en_o[1:0] = '0;  // wr only oper
         end else begin
-          spi_io_en_o[1:0] = rx_valid_o ? '1 : '0;
+          spi_io_en_o[1:0] = s_par_trg ? '1 : '0;
         end
       end
       `SPI_QUAD_SPI: begin
         if (~rwm_i) begin
           spi_io_en_o[3:0] = '0;  // wr only oper
         end else begin
-          spi_io_en_o[3:0] = rx_valid_o ? '1 : '0;
+          spi_io_en_o[3:0] = s_par_trg ? '1 : '0;
         end
       end
       default: spi_io_en_o = '1;
@@ -95,11 +96,11 @@ module spi_core (
     unique case (spm_i)
       `SPI_STD_SPI: spi_io_out_o[0] = s_std_mosi[tdtb_i];
       `SPI_DUAL_SPI: begin
-        spi_io_out_o[0] = 1'b0 ? s_dual_io[0][tdtb_i] : s_std_mosi[0];  // 8b cmd trans
+        spi_io_out_o[0] = s_par_trg ? s_dual_io[0][tdtb_i] : s_std_mosi[0];  // 8b cmd trans
         spi_io_out_o[1] = s_dual_io[1][tdtb_i];
       end
       `SPI_QUAD_SPI: begin
-        spi_io_out_o[0] = 1'b0 ? s_quad_io[0][tdtb_i] : s_std_mosi[0];  // 8b cmd trans
+        spi_io_out_o[0] = s_par_trg ? s_quad_io[0][tdtb_i] : s_std_mosi[0];  // 8b cmd trans
         spi_io_out_o[1] = s_quad_io[1][tdtb_i];
         spi_io_out_o[2] = s_quad_io[2][tdtb_i];
         spi_io_out_o[3] = s_quad_io[3][tdtb_i];
@@ -108,6 +109,22 @@ module spi_core (
     endcase
   end
 
+  assign s_par_trg = s_ser_cnt_q == snm_i;
+  always_comb begin
+    s_ser_cnt_d = s_ser_cnt_q;
+    if (s_st_fe_trg) begin
+      s_ser_cnt_d = 1'b0;
+    end else if (s_tran_done && ~s_par_trg) begin
+      s_ser_cnt_d = s_ser_cnt_q + 1'b1;
+    end
+  end
+  dffr #(4) u_ser_cnt_dffr (
+      clk_i,
+      rst_n_i,
+      s_ser_cnt_d,
+      s_ser_cnt_q
+  );
+
   always_comb begin
     s_tran_cnt_d = s_tran_cnt_q;
     if (~s_tran_done && st_i) begin
@@ -115,12 +132,16 @@ module spi_core (
         s_tran_cnt_d = s_tran_cnt_q - 1'b1;
       end
     end else begin
-      unique case (tdtb_i)
-        2'b00: s_tran_cnt_d = {1'b0, 6'd8};
-        2'b01: s_tran_cnt_d = {1'b0, 6'd16};
-        2'b10: s_tran_cnt_d = {1'b0, 6'd24};
-        2'b11: s_tran_cnt_d = {1'b0, 6'd32};
-      endcase
+      if (spm_i != `SPI_STD_SPI && ~s_par_trg) begin
+        s_tran_cnt_d = 7'd8;
+      end else begin
+        unique case (tdtb_i)
+          2'b00: s_tran_cnt_d = 7'd8;
+          2'b01: s_tran_cnt_d = 7'd16;
+          2'b10: s_tran_cnt_d = 7'd24;
+          2'b11: s_tran_cnt_d = 7'd32;
+        endcase
+      end
     end
   end
   dffrh #(`SPI_DATA_BIT_WIDTH + 2) u_tran_cnt_dffrh (
@@ -210,7 +231,7 @@ module spi_core (
   end
 
   // put data to rx fifo, delay tran done with one cycle
-  assign rx_valid_o = rwm_i && s_st_fe_trg || (s_trl_q < cal_i && s_tran_done_fe_trg);
+  assign rx_valid_o = rwm_i && (s_st_fe_trg || (s_trl_q < cal_i && s_tran_done_fe_trg));
   assign rx_data_o  = (rx_valid_o && rx_ready_i) ? s_std_rd_data[rdtb_i] : '0;
   for (genvar i = 1; i <= 4; i++) begin
     shift_reg #(

@@ -37,7 +37,7 @@ module apb4_spi #(
   logic [1:0] s_bit_tdtb, s_bit_rdtb, s_bit_spm;
   logic [4:0] s_bit_txth, s_bit_rxth;
   logic s_bit_txie, s_bit_rxie, s_bit_en, s_bit_st, s_bit_rwm;
-  logic [3:0] s_bit_nss, s_bit_csv;
+  logic [3:0] s_bit_snm, s_bit_nss, s_bit_csv;
   logic s_bit_txif, s_bit_rxif;
   // irq
   logic s_busy, s_tx_irq_trg, s_rx_irq_trg;
@@ -75,6 +75,7 @@ module apb4_spi #(
   assign s_bit_rwm       = s_spi_ctrl2_q[4];
   assign s_bit_nss       = s_spi_ctrl2_q[8:5];
   assign s_bit_csv       = s_spi_ctrl2_q[12:9];
+  assign s_bit_snm       = s_spi_ctrl2_q[16:13];
 
   assign s_bit_txif      = s_spi_stat_q[0];
   assign s_bit_rxif      = s_spi_stat_q[1];
@@ -258,6 +259,7 @@ module apb4_spi #(
       .tdtb_i      (s_bit_tdtb),
       .rdtb_i      (s_bit_rdtb),
       .spm_i       (s_bit_spm),
+      .snm_i       (s_bit_snm),
       .cal_i       (s_spi_cal_q),
       .trl_valid_i (s_apb4_wr_hdshk && s_apb4_addr == `SPI_TRL),
       .trl_i       (apb4.pwdata[`SPI_TRL_WIDTH-1:0]),
