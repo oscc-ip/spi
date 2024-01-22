@@ -53,8 +53,10 @@ module spi_core (
   logic s_rx_data_en, s_par_trg;
   logic s_tran_done, s_tran_done_fe_trg, s_st_re_trg, s_st_fe_trg, s_tx_trg, s_rx_trg;
   logic [ 3:0] s_std_mosi;
-  logic [ 3:0] s_dual_io     [0:1];
+  logic [ 1:0] s_dual_io     [0:3];
+  logic [ 1:0] s_dual_wr_data[0:3];
   logic [ 3:0] s_quad_io     [0:3];
+  logic [ 3:0] s_quad_wr_data[0:3];
   logic [31:0] s_std_rd_data [0:3];
   logic [31:0] s_dual_rd_data[0:3];
   logic [31:0] s_quad_rd_data[0:3];
@@ -78,14 +80,14 @@ module spi_core (
         if (~rwm_i) begin
           spi_io_en_o[1:0] = '0;  // wr only oper
         end else begin
-          spi_io_en_o[1:0] = s_par_trg ? '1 : '0;
+          spi_io_en_o[1:0] = s_trl_q <= cal_i ? '1 : '0;
         end
       end
       `SPI_QUAD_SPI: begin
         if (~rwm_i) begin
           spi_io_en_o[3:0] = '0;  // wr only oper
         end else begin
-          spi_io_en_o[3:0] = s_par_trg ? '1 : '0;
+          spi_io_en_o[3:0] = s_trl_q <= cal_i ? '1 : '0;
         end
       end
       default: spi_io_en_o = '1;
@@ -98,14 +100,14 @@ module spi_core (
     unique case (spm_i)
       `SPI_STD_SPI: spi_io_out_o[0] = s_std_mosi[tdtb_i];
       `SPI_DUAL_SPI: begin
-        spi_io_out_o[0] = s_par_trg ? s_dual_io[0][tdtb_i] : s_std_mosi[0];  // 8b cmd trans
-        spi_io_out_o[1] = s_dual_io[1][tdtb_i];
+        spi_io_out_o[0] = s_par_trg ? s_dual_io[tdtb_i][0] : s_std_mosi[0];  // 8b cmd trans
+        spi_io_out_o[1] = s_dual_io[tdtb_i][1];
       end
       `SPI_QUAD_SPI: begin
-        spi_io_out_o[0] = s_par_trg ? s_quad_io[0][tdtb_i] : s_std_mosi[0];  // 8b cmd trans
-        spi_io_out_o[1] = s_quad_io[1][tdtb_i];
-        spi_io_out_o[2] = s_quad_io[2][tdtb_i];
-        spi_io_out_o[3] = s_quad_io[3][tdtb_i];
+        spi_io_out_o[0] = s_par_trg ? s_quad_io[tdtb_i][0] : s_std_mosi[0];  // 8b cmd trans
+        spi_io_out_o[1] = s_quad_io[tdtb_i][1];
+        spi_io_out_o[2] = s_quad_io[tdtb_i][2];
+        spi_io_out_o[3] = s_quad_io[tdtb_i][3];
       end
       default:      spi_io_out_o[3:0] = '0;
     endcase
@@ -262,6 +264,48 @@ module spi_core (
     );
   end
 
+  // dual spi tx
+  for (genvar i = 1; i <= 4; i++) begin
+    shift_reg #(
+        .DATA_WIDTH(8 * i),
+        .SHIFT_NUM (2)
+    ) u_dual_spi_tx_shift_reg (
+        .clk_i     (clk_i),
+        .rst_n_i   (rst_n_i),
+        .type_i    (`SHIFT_REG_TYPE_LOGIC),
+        .dir_i     ({1'b0, lsb_i}),
+        .ld_en_i   (tx_valid_i && tx_ready_o),
+        .sft_en_i  (s_tx_trg),
+        .ser_dat_i ('0),
+        .par_data_i(tx_data_i[8*i-1:0]),
+        .ser_dat_o (s_dual_wr_data[i-1]),
+        .par_data_o()
+    );
+
+    assign s_dual_io[i-1] = ~lsb_i ? s_dual_wr_data[i-1] : {s_dual_wr_data[i-1][0], s_dual_wr_data[i-1][1]};
+  end
+
+  // quad spi tx
+  for (genvar i = 1; i <= 4; i++) begin
+    shift_reg #(
+        .DATA_WIDTH(8 * i),
+        .SHIFT_NUM (4)
+    ) u_quad_spi_tx_shift_reg (
+        .clk_i     (clk_i),
+        .rst_n_i   (rst_n_i),
+        .type_i    (`SHIFT_REG_TYPE_LOGIC),
+        .dir_i     ({1'b0, lsb_i}),
+        .ld_en_i   (tx_valid_i && tx_ready_o),
+        .sft_en_i  (s_tx_trg),
+        .ser_dat_i ('0),
+        .par_data_i(tx_data_i[8*i-1:0]),
+        .ser_dat_o (s_quad_wr_data[i-1]),
+        .par_data_o()
+    );
+
+    assign s_quad_io[i-1] = ~lsb_i ? s_quad_wr_data[i-1] :
+    {s_quad_wr_data[i-1][0], s_quad_wr_data[i-1][1], s_quad_wr_data[i-1][2], s_quad_wr_data[i-1][3]};
+  end
 
   // put data to rx fifo, delay tran done with one cycle
   assign rx_valid_o = rwm_i && (s_st_fe_trg || (s_trl_q < cal_i && s_tran_done_fe_trg));
@@ -322,6 +366,30 @@ module spi_core (
     // fill unused bits
     if (i <= 3) begin
       assign s_dual_rd_data[i-1][31:8*i] = '0;
+    end
+  end
+
+  // quad spi rx
+  for (genvar i = 1; i <= 4; i++) begin
+    shift_reg #(
+        .DATA_WIDTH(8 * i),
+        .SHIFT_NUM (4)
+    ) u_quad_spi_rx_shift_reg (
+        .clk_i     (clk_i),
+        .rst_n_i   (rst_n_i),
+        .type_i    (`SHIFT_REG_TYPE_SERI),
+        .dir_i     ({1'b0, lsb_i}),
+        .ld_en_i   (1'b0),
+        .sft_en_i  (s_rx_trg),
+        .ser_dat_i (s_trl_q <= cal_i ? spi_io_in_i[3:0] : '0),
+        .par_data_i('0),
+        .ser_dat_o (),
+        .par_data_o(s_quad_rd_data[i-1][8*i-1:0])
+    );
+
+    // fill unused bits
+    if (i <= 3) begin
+      assign s_quad_rd_data[i-1][31:8*i] = '0;
     end
   end
 endmodule
