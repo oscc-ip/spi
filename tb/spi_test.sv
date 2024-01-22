@@ -27,6 +27,7 @@ class SPITest extends APB4Master;
   extern task automatic test_wr_rd_reg(input bit [31:0] run_times = 1000);
   extern task automatic w25q_std_spi_wr_rd_test();
   extern task automatic w25q_dual_spi_wr_rd_test();
+  extern task automatic w25q_quad_spi_wr_rd_test();
   extern task automatic test_irq(input bit [31:0] run_times = 10);
 endclass
 
@@ -68,7 +69,7 @@ task automatic SPITest::w25q_std_spi_wr_rd_test();
 
   for (int i = 0; i < 256 / 4; i++) begin
     this.wr_que.push_back($random);
-    if(i < 3) begin
+    if (i < 3) begin
       $display("wr_que[%d]:%h", i, this.wr_que[i]);
     end
   end
@@ -118,6 +119,7 @@ endtask
 
 task automatic SPITest::w25q_dual_spi_wr_rd_test();
   $display("=== [test dual spi wr rd] ===");
+  $display("=== [cmd: ser addr: ser data: par] ===");
   repeat (200 * 3) @(posedge this.apb4.pclk);
   this.write(`SPI_DIV_ADDR, 32'd0 & {`SPI_DIV_WIDTH{1'b1}});
   this.write(`SPI_CTRL1_ADDR, 32'b01_00000000_0011_1100_1000 & {`SPI_CTRL1_WIDTH{1'b1}});
@@ -136,6 +138,55 @@ task automatic SPITest::w25q_dual_spi_wr_rd_test();
     this.read(`SPI_RXR_ADDR);
     $display("%t rd data: %h", $time, super.rd_data);
   end
+
+  $display("=== [cmd: ser addr: par data: par] ===");
+  repeat (200 * 3) @(posedge this.apb4.pclk);
+  this.write(`SPI_DIV_ADDR, 32'd0 & {`SPI_DIV_WIDTH{1'b1}});
+  this.write(`SPI_CTRL1_ADDR, 32'b01_00000000_0011_1100_1000 & {`SPI_CTRL1_WIDTH{1'b1}});
+  this.write(`SPI_CTRL2_ADDR, 32'b0010_0000 & {`SPI_CTRL2_WIDTH{1'b1}});  // clear que
+  this.write(`SPI_CTRL2_ADDR, 32'b0001_0000_0001_0_0100 & {`SPI_CTRL2_WIDTH{1'b1}});
+  this.write(`SPI_TXR_ADDR, 32'hBB);  // cmd
+  this.write(`SPI_TXR_ADDR, 32'h0);  // addr+dummy
+  this.write(`SPI_CAL_ADDR, 2);
+  this.write(`SPI_TRL_ADDR, 2 + 2);
+  this.write(`SPI_CTRL2_ADDR, 32'b0001_0000_0001_1_1100 & {`SPI_CTRL2_WIDTH{1'b1}});
+  repeat (200 * 4) @(posedge this.apb4.pclk);
+  for (int i = 0; i < 3; i++) begin
+    this.read(`SPI_RXR_ADDR);
+    $display("%t rd data: %h", $time, super.rd_data);
+  end
+endtask
+
+task automatic SPITest::w25q_quad_spi_wr_rd_test();
+  $display("=== [test quad spi wr rd] ===");
+  $display("=== [cmd: ser addr: ser data: par] ===");
+  repeat (200 * 3) @(posedge this.apb4.pclk);
+  this.write(`SPI_DIV_ADDR, 32'd0 & {`SPI_DIV_WIDTH{1'b1}});
+  this.write(`SPI_CTRL1_ADDR, 32'b00_0000_1000 & {`SPI_CTRL1_WIDTH{1'b1}});
+  this.write(`SPI_CTRL2_ADDR, 32'b0010_0000 & {`SPI_CTRL2_WIDTH{1'b1}});  // clear que
+  this.write(`SPI_CTRL2_ADDR, 32'b0010_0100 & {`SPI_CTRL2_WIDTH{1'b1}});
+  repeat (100) @(posedge this.apb4.pclk);
+  this.write(`SPI_TXR_ADDR, 32'h06);
+  this.write(`SPI_CTRL2_ADDR, 32'b0010_1100 & {`SPI_CTRL2_WIDTH{1'b1}});  //write enable
+  repeat (50) @(posedge this.apb4.pclk);
+
+  // this.write(`SPI_CTRL1_ADDR, 32'b10_00000000_0011_1100_1000 & {`SPI_CTRL1_WIDTH{1'b1}});
+  // this.write(`SPI_CTRL2_ADDR, 32'b0010_0000 & {`SPI_CTRL2_WIDTH{1'b1}});  // clear que
+  // this.write(`SPI_CTRL2_ADDR, 32'b0101_0000_0001_0_0100 & {`SPI_CTRL2_WIDTH{1'b1}});
+  // this.write(`SPI_TXR_ADDR, 32'h6B);  // cmd
+  // this.write(`SPI_TXR_ADDR, 32'h0);  // addr0
+  // this.write(`SPI_TXR_ADDR, 32'h0);  // addr1
+  // this.write(`SPI_TXR_ADDR, 32'h0);  // addr2
+  // this.write(`SPI_TXR_ADDR, 32'h0);  // dummy
+  // this.write(`SPI_CAL_ADDR, 2);
+  // this.write(`SPI_TRL_ADDR, 5 + 2);
+  // this.write(`SPI_CTRL2_ADDR, 32'b0101_0000_0001_1_1100 & {`SPI_CTRL2_WIDTH{1'b1}});
+  // repeat (200 * 4) @(posedge this.apb4.pclk);
+  // for (int i = 0; i < 3; i++) begin
+  //   this.read(`SPI_RXR_ADDR);
+  //   $display("%t rd data: %h", $time, super.rd_data);
+  // end
+
 endtask
 
 task automatic SPITest::test_irq(input bit [31:0] run_times = 10);
