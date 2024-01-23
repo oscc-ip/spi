@@ -79,15 +79,17 @@ module spi_core (
       `SPI_DUAL_SPI: begin
         if (~rwm_i) begin
           spi_io_en_o[1:0] = '0;  // wr only oper
-        end else begin
-          spi_io_en_o[1:0] = s_trl_q <= cal_i ? '1 : '0;
+        end else begin  // when par addr mode, set io high-z state
+          spi_io_en_o[0] = s_trl_q <= cal_i ? 1'b1 : 1'b0;
+          spi_io_en_o[1] = snm_i > 4'b1 ? 1'b1 : (s_trl_q <= cal_i ? 1'b1 : 1'b0);
         end
       end
       `SPI_QUAD_SPI: begin
         if (~rwm_i) begin
           spi_io_en_o[3:0] = '0;  // wr only oper
         end else begin
-          spi_io_en_o[3:0] = s_trl_q <= cal_i ? '1 : '0;
+          spi_io_en_o[0]   = s_trl_q <= cal_i ? 1'b1 : 1'b0;
+          spi_io_en_o[3:1] = snm_i > 4'b1 ? '1 : (s_trl_q <= cal_i ? '1 : '0);
         end
       end
       default: spi_io_en_o = '1;
