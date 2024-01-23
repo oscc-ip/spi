@@ -1,10 +1,10 @@
 # SPI
 <p>
     <a href=".">
-      <img src="https://img.shields.io/badge/RTL%20dev-in%20progress-silver?style=flat-square">
+      <img src="https://img.shields.io/badge/RTL%20dev-done-green?style=flat-square">
     </a>
     <a href=".">
-      <img src="https://img.shields.io/badge/VCS%20sim-in%20progress-silver?style=flat-square">
+      <img src="https://img.shields.io/badge/VCS%20sim-done-green?style=flat-square">
     </a>
     <a href=".">
       <img src="https://img.shields.io/badge/FPGA%20verif-no%20start-wheat?style=flat-square">
