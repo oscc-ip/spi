@@ -101,13 +101,13 @@ module spi_core (
       `SPI_STD_SPI: spi_io_out_o[0] = s_std_mosi[tdtb_i];
       `SPI_DUAL_SPI: begin
         spi_io_out_o[0] = s_par_trg ? s_dual_io[tdtb_i][0] : s_std_mosi[0];  // 8b cmd trans
-        spi_io_out_o[1] = s_dual_io[tdtb_i][1];
+        spi_io_out_o[1] = s_par_trg ? s_dual_io[tdtb_i][1] : '0;
       end
       `SPI_QUAD_SPI: begin
         spi_io_out_o[0] = s_par_trg ? s_quad_io[tdtb_i][0] : s_std_mosi[0];  // 8b cmd trans
-        spi_io_out_o[1] = s_quad_io[tdtb_i][1];
-        spi_io_out_o[2] = s_quad_io[tdtb_i][2];
-        spi_io_out_o[3] = s_quad_io[tdtb_i][3];
+        spi_io_out_o[1] = s_par_trg ? s_quad_io[tdtb_i][1] : '0;
+        spi_io_out_o[2] = s_par_trg ? s_quad_io[tdtb_i][2] : '0;
+        spi_io_out_o[3] = s_par_trg ? s_quad_io[tdtb_i][3] : '0;
       end
       default:      spi_io_out_o[3:0] = '0;
     endcase
