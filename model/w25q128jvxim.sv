@@ -756,9 +756,11 @@ begin :read_opcode
 
         `CMD_PAGE_PROGRAM_QUAD :
         begin
+            $display("CMD_PAGE_PROGRAM_QUAD: %h %h %h %h", status_reg[`WEL], status_reg[`SUS], status_reg[`QE], flag_power_down);
             if(status_reg[`WEL]&& !status_reg[`SUS] && status_reg[`QE] && !flag_power_down)
             begin
                 flag_read_op_reg = 1'b0;
+                $display("CMD_PAGE_PROGRAM_QUAD2");
                 write_page(1);
             end
         end
