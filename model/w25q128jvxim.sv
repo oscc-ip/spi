@@ -595,8 +595,10 @@ begin :read_opcode
         begin
             // $display("status0: %d %d %d", flag_power_down, WPn, status_reg[`QE]);
             // if((!flag_power_down) && (WPn || status_reg[`QE]))
-            if(!flag_power_down)
+            if(!flag_power_down) begin
                 status_reg[`WEL] = 1;
+                $display("status_reg[15:8]: %h", status_reg[15:8]);
+            end
         end
 
         `CMD_WRITE_ENABLE_VSR :
@@ -685,6 +687,7 @@ begin :read_opcode
         begin
             if(!status_reg[`WIP] && (status_reg[`WEL] || flag_volatile_sr_write) && !flag_power_down && !status_reg[`SUS])
             begin
+                $display("`CMD_WRITE_STATUS2");
                 flag_read_op_reg = 1'b0;
                 case ({status_reg[`SRL],status_reg[`SRP]})
                     2'b00, 2'b01 :
@@ -697,6 +700,7 @@ begin :read_opcode
                             // flag write now that we have 8 bits....
                             // command must bail if /CS does not go high at 8th clock
                             flag_write_status_reg = 1;
+                            $display("status_reg_shadow[15:8]: %h", status_reg_shadow[15:8]);
                             // 2nd byte is optional
                             if(flag_qpi_mode == 1)
                                 @(posedge CLK);
@@ -1360,6 +1364,7 @@ task input_byte;
             if(DIO_Output_Enable_reg != 1'b0)
                 DIO_Output_Enable_reg = 1'b0;
 
+            // $display("%t", $time);
             for(x = 7; x >= 0; x=x-1)
             begin
                 get_posclk_holdn;
@@ -2328,7 +2333,7 @@ endtask
 task read_page_quadio;
     input [7:0] cmd;
     integer x;
-
+    // $display("%t read page quadio, status_reg[`WIP]: %d", $time, status_reg[`WIP]);
     begin
 
 
@@ -2358,6 +2363,7 @@ task read_page_quadio;
             begin
                 byte_address = byte_address & ADDRESS_MASK;
                 output_byte_quad(memory[byte_address]);
+                // $display("%t memory[%d]: %h", $time, byte_address, memory[byte_address]);
                 if(cmd == `CMD_READ_DATA_FAST_WRAP)
                 begin
                     case ({read_param_reg[1],read_param_reg[0]})

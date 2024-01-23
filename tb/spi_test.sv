@@ -165,27 +165,59 @@ task automatic SPITest::w25q_quad_spi_wr_rd_test();
   this.write(`SPI_CTRL1_ADDR, 32'b00_0000_1000 & {`SPI_CTRL1_WIDTH{1'b1}});
   this.write(`SPI_CTRL2_ADDR, 32'b0010_0000 & {`SPI_CTRL2_WIDTH{1'b1}});  // clear que
   this.write(`SPI_CTRL2_ADDR, 32'b0010_0100 & {`SPI_CTRL2_WIDTH{1'b1}});
-  repeat (100) @(posedge this.apb4.pclk);
+  repeat (200) @(posedge this.apb4.pclk);
   this.write(`SPI_TXR_ADDR, 32'h06);
+  this.write(`SPI_CAL_ADDR, 0);
+  this.write(`SPI_TRL_ADDR, 0);
   this.write(`SPI_CTRL2_ADDR, 32'b0010_1100 & {`SPI_CTRL2_WIDTH{1'b1}});  //write enable
-  repeat (50) @(posedge this.apb4.pclk);
+  repeat (200) @(posedge this.apb4.pclk);
 
-  // this.write(`SPI_CTRL1_ADDR, 32'b10_00000000_0011_1100_1000 & {`SPI_CTRL1_WIDTH{1'b1}});
-  // this.write(`SPI_CTRL2_ADDR, 32'b0010_0000 & {`SPI_CTRL2_WIDTH{1'b1}});  // clear que
-  // this.write(`SPI_CTRL2_ADDR, 32'b0101_0000_0001_0_0100 & {`SPI_CTRL2_WIDTH{1'b1}});
-  // this.write(`SPI_TXR_ADDR, 32'h6B);  // cmd
-  // this.write(`SPI_TXR_ADDR, 32'h0);  // addr0
-  // this.write(`SPI_TXR_ADDR, 32'h0);  // addr1
-  // this.write(`SPI_TXR_ADDR, 32'h0);  // addr2
-  // this.write(`SPI_TXR_ADDR, 32'h0);  // dummy
-  // this.write(`SPI_CAL_ADDR, 2);
-  // this.write(`SPI_TRL_ADDR, 5 + 2);
-  // this.write(`SPI_CTRL2_ADDR, 32'b0101_0000_0001_1_1100 & {`SPI_CTRL2_WIDTH{1'b1}});
-  // repeat (200 * 4) @(posedge this.apb4.pclk);
-  // for (int i = 0; i < 3; i++) begin
-  //   this.read(`SPI_RXR_ADDR);
-  //   $display("%t rd data: %h", $time, super.rd_data);
-  // end
+  this.write(`SPI_CTRL1_ADDR, 32'b0001_0100_1000 & {`SPI_CTRL1_WIDTH{1'b1}});
+  this.write(`SPI_CTRL2_ADDR, 32'b0010_0000 & {`SPI_CTRL2_WIDTH{1'b1}});  // clear que
+  this.write(`SPI_CTRL2_ADDR, 32'b0010_0100 & {`SPI_CTRL2_WIDTH{1'b1}});
+  repeat (200) @(posedge this.apb4.pclk);
+  this.write(`SPI_TXR_ADDR, 32'h3102);
+  this.write(`SPI_CAL_ADDR, 0);
+  this.write(`SPI_TRL_ADDR, 0);
+  this.write(`SPI_CTRL2_ADDR, 32'b0010_1100 & {`SPI_CTRL2_WIDTH{1'b1}});  //write qe = 1
+  repeat (200) @(posedge this.apb4.pclk);
+
+  $display("=== [cmd: ser addr: par data: par] ===");
+  repeat (200 * 3) @(posedge this.apb4.pclk);
+  this.write(`SPI_CTRL1_ADDR, 32'b10_00000000_0011_1100_1000 & {`SPI_CTRL1_WIDTH{1'b1}});
+  this.write(`SPI_CTRL2_ADDR, 32'b0010_0000 & {`SPI_CTRL2_WIDTH{1'b1}});  // clear que
+  this.write(`SPI_CTRL2_ADDR, 32'b0101_0000_0001_0_0100 & {`SPI_CTRL2_WIDTH{1'b1}});
+  this.write(`SPI_TXR_ADDR, 32'h6B); // cmd
+  this.write(`SPI_TXR_ADDR, 32'h0);  // addr[23:16]
+  this.write(`SPI_TXR_ADDR, 32'h0);  // addr[15:8]
+  this.write(`SPI_TXR_ADDR, 32'h0);  // addr[7:0]
+  this.write(`SPI_TXR_ADDR, 32'h0);  // dummy
+  this.write(`SPI_CAL_ADDR, 2);
+  this.write(`SPI_TRL_ADDR, 5 + 2);
+  this.write(`SPI_CTRL2_ADDR, 32'b0101_0000_0001_1_1100 & {`SPI_CTRL2_WIDTH{1'b1}});
+  repeat (200 * 4) @(posedge this.apb4.pclk);
+  for (int i = 0; i < 3; i++) begin
+    this.read(`SPI_RXR_ADDR);
+    $display("%t rd data: %h", $time, super.rd_data);
+  end
+
+  $display("=== [cmd: ser addr: par data: par] ===");
+  repeat (200 * 3) @(posedge this.apb4.pclk);
+  this.write(`SPI_CTRL1_ADDR, 32'b10_00000000_0001_0100_1000 & {`SPI_CTRL1_WIDTH{1'b1}});
+  this.write(`SPI_CTRL2_ADDR, 32'b0010_0000 & {`SPI_CTRL2_WIDTH{1'b1}});  // clear que
+  this.write(`SPI_CTRL2_ADDR, 32'b0001_0000_0001_0_0100 & {`SPI_CTRL2_WIDTH{1'b1}});
+  this.write(`SPI_TXR_ADDR, 16'hEB);  // cmd
+  this.write(`SPI_TXR_ADDR, 16'h0);  // addr[23:8]
+  this.write(`SPI_TXR_ADDR, 16'h0);  // addr[7:0] + M[7:0]
+  this.write(`SPI_TXR_ADDR, 16'h0);  // dummy
+  this.write(`SPI_CAL_ADDR, 2);
+  this.write(`SPI_TRL_ADDR, 4 + 2);
+  this.write(`SPI_CTRL2_ADDR, 32'b0001_0000_0001_1_1100 & {`SPI_CTRL2_WIDTH{1'b1}});
+  repeat (200 * 4) @(posedge this.apb4.pclk);
+  for (int i = 0; i < 3; i++) begin
+    this.read(`SPI_RXR_ADDR);
+    $display("%t rd data: %h", $time, super.rd_data);
+  end
 
 endtask
 
