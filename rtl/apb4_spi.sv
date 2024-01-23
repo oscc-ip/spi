@@ -31,7 +31,6 @@ module apb4_spi #(
   logic [`SPI_CAL_WIDTH-1:0] s_spi_cal_d, s_spi_cal_q;
   logic s_spi_cal_en;
   logic [`SPI_STAT_WIDTH-1:0] s_spi_stat_d, s_spi_stat_q;
-  logic s_spi_stat_en;
   // bit
   logic s_bit_cpha, s_bit_cpol, s_bit_lsb, s_bit_ass, s_bit_rdm, s_bit_sstr;
   logic [1:0] s_bit_tdtb, s_bit_rdtb, s_bit_spm;
@@ -148,9 +147,6 @@ module apb4_spi #(
     end
   end
 
-  assign s_spi_stat_en = ((s_bit_txif || s_bit_rxif) && s_apb4_rd_hdshk && s_apb4_addr == `SPI_STAT)
-                      || (~s_bit_txif && s_bit_en && s_bit_txie && s_tx_irq_trg)
-                      || (~s_bit_rxif && s_bit_en && s_bit_rxie && s_rx_irq_trg);
   always_comb begin
     s_spi_stat_d[4] = ~s_rx_pop_valid;
     s_spi_stat_d[3] = ~s_tx_push_ready;
@@ -165,10 +161,9 @@ module apb4_spi #(
       s_spi_stat_d[1:0] = {s_bit_rxif, s_bit_txif};
     end
   end
-  dffer #(`SPI_STAT_WIDTH) u_spi_stat_dffer (
+  dffr #(`SPI_STAT_WIDTH) u_spi_stat_dffr (
       apb4.pclk,
       apb4.presetn,
-      s_spi_stat_en,
       s_spi_stat_d,
       s_spi_stat_q
   );
