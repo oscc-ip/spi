@@ -187,7 +187,7 @@ task automatic SPITest::w25q_quad_spi_wr_rd_test();
   this.write(`SPI_CTRL1_ADDR, 32'b10_00000000_0011_1100_1000 & {`SPI_CTRL1_WIDTH{1'b1}});
   this.write(`SPI_CTRL2_ADDR, 32'b0010_0000 & {`SPI_CTRL2_WIDTH{1'b1}});  // clear que
   this.write(`SPI_CTRL2_ADDR, 32'b0101_0000_0001_0_0100 & {`SPI_CTRL2_WIDTH{1'b1}});
-  this.write(`SPI_TXR_ADDR, 32'h6B); // cmd
+  this.write(`SPI_TXR_ADDR, 32'h6B);  // cmd
   this.write(`SPI_TXR_ADDR, 32'h0);  // addr[23:16]
   this.write(`SPI_TXR_ADDR, 32'h0);  // addr[15:8]
   this.write(`SPI_TXR_ADDR, 32'h0);  // addr[7:0]
@@ -223,25 +223,28 @@ endtask
 
 task automatic SPITest::test_irq(input bit [31:0] run_times = 10);
   super.test_irq();
-  // this.write(`SPI_CTRL1_ADDR, 32'b100 & {`SPI_CTRL1_WIDTH{1'b1}});  // clear cnt
-  // this.write(`PWM_CR0_ADDR, 32'b0 & {`PWM_CRX_WIDTH{1'b1}});
-  // this.write(`PWM_CR1_ADDR, 32'b0 & {`PWM_CRX_WIDTH{1'b1}});
-  // this.write(`PWM_CR2_ADDR, 32'b0 & {`PWM_CRX_WIDTH{1'b1}});
-  // this.write(`PWM_CR3_ADDR, 32'b0 & {`PWM_CRX_WIDTH{1'b1}});
-  // this.read(`PWM_STAT_ADDR);  // clear the irq
+  repeat (200 * 3) @(posedge this.apb4.pclk);
+  this.write(`SPI_CTRL1_ADDR, 32'b10_00000_00011_01_0100_1000 & {`SPI_CTRL1_WIDTH{1'b1}});
+  this.write(`SPI_CTRL2_ADDR, 32'b0010_0000 & {`SPI_CTRL2_WIDTH{1'b1}});  // clear que
+  this.write(`SPI_CTRL2_ADDR, 32'b0001_0000_0001_0_0100 & {`SPI_CTRL2_WIDTH{1'b1}});
+  this.write(`SPI_TXR_ADDR, 16'hEB);  // cmd
+  this.write(`SPI_TXR_ADDR, 16'h0);  // addr[23:8]
+  this.write(`SPI_TXR_ADDR, 16'h0);  // addr[7:0] + M[7:0]
+  this.write(`SPI_TXR_ADDR, 16'h0);  // dummy
+  this.write(`SPI_CAL_ADDR, 2);
+  this.write(`SPI_TRL_ADDR, 4 + 2);
+  this.write(`SPI_CTRL2_ADDR, 32'b0001_0000_0001_1_1111 & {`SPI_CTRL2_WIDTH{1'b1}});
+  repeat (200 * 4) @(posedge this.apb4.pclk);
+  for (int i = 0; i < 3; i++) begin
+    this.read(`SPI_RXR_ADDR);
+    $display("%t rd data: %h", $time, super.rd_data);
+  end
 
-  // this.write(`SPI_CTRL1_ADDR, 32'b0 & {`SPI_CTRL1_WIDTH{1'b1}});
-  // this.write(`PWM_PSCR_ADDR, 32'd4 & {`PWM_PSCR_WIDTH{1'b1}});
-  // this.write(`PWM_CMP_ADDR, 32'hE & {`PWM_CMP_WIDTH{1'b1}});
-
-  // for (int i = 0; i < run_times; i++) begin
-  //   this.write(`SPI_CTRL1_ADDR, 32'b0 & {`SPI_CTRL1_WIDTH{1'b1}});
-  //   this.read(`PWM_STAT_ADDR);
-  //   $display("%t rd_data: %h", $time, super.rd_data);
-  //   this.write(`SPI_CTRL1_ADDR, 32'b11 & {`SPI_CTRL1_WIDTH{1'b1}});
-  //   @(this.spi.irq_o);
-  //   repeat (200) @(posedge this.apb4.pclk);
-  // end
+  this.write(`SPI_CTRL2_ADDR, 32'b0001_0000_0001_1_0100 & {`SPI_CTRL2_WIDTH{1'b1}});
+  for (int i = 0; i < 2; i++) begin
+    this.read(`SPI_STAT_ADDR);
+    $display("%t stat reg: %h", $time, super.rd_data);
+  end
 
 endtask
 `endif
