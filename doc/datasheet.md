@@ -4,7 +4,6 @@
 The `spi(serial peripheral interface)` IP is a fully parameterised soft IP to implement the Motorola SPI standard protocol. The IP features an APB4 slave interface, fully compliant with the AMBA APB Protocol Specification v2.0.
 
 ### Feature
-## Features
 * Compatible with Motorola SPI standard
 * Half duplex serial data transmission
 * SPI master mode only
@@ -68,6 +67,52 @@ The `spi(serial peripheral interface)` IP is a fully parameterised soft IP to im
 
 reset value: `0x0000_0000`
 
+* SPM: spi mode
+    * `SPM = 2'b00`: std spi mode
+    * `SPM = 2'b01`: dual spi mode
+    * `SPM = 2'b10`: quad spi mode
+    * `SPM = 2'b11`: qpi mode
+
+* RXTH: receive fifo interrupt threshold
+
+* TXTH: transmit fifo interrupt threshold
+
+* RDTB: size of single receive data
+    * `RDTB = 2'b00`: 8-bit
+    * `RDTB = 2'b01`: 16-bit
+    * `RDTB = 2'b10`: 24-bit
+    * `RDTB = 2'b11`: 32-bit
+
+* TDTB: size of single transmit data
+    * `TDTB = 2'b00`: 8-bit
+    * `TDTB = 2'b01`: 16-bit
+    * `TDTB = 2'b10`: 24-bit
+    * `TDTB = 2'b11`: 32-bit
+
+* SSTR: slave select transmit receive(no use)
+    * `SSTR = 1'b0`: spi master mode
+    * `SSTR = 1'b1`: spi slave mode
+
+* RDM: reverse data mode
+    * `RDM = 1'b0`: normal read data
+    * `RDM = 1'b1`: byte-reverse of read data
+
+* ASS: automate slave select
+    * `ASS = 1'b0`: software slave select
+    * `ASS = 1'b1`: hardware slave select
+
+* LSB: serial send the LSB first
+    * `LSB = 1'b0`: send MSB first
+    * `LSB = 1'b1`: send LSB first
+
+* CPOL: clock polarity
+    * `CPOL = 1'b0`: idle clock is high
+    * `CPOL = 1'b1`: idle clock is low
+
+* CPHA: clock phase
+    * `CPHA = 1'b0`: sample along the first clock edge
+    * `CPHA = 1'b1`: sample along the second clock edge
+
 #### Control 2 Register
 | bit | access  | description |
 |:---:|:-------:| :---------: |
@@ -81,14 +126,40 @@ reset value: `0x0000_0000`
 | `[1:1]` | RW | RXIE |
 | `[0:0]` | RW | TXIE |
 
+
+* SNM:
+
+* CSV: 4-bit chip select reverse
+
+* NSS: 4-bit software slave select
+
+* RWM:
+
+* ST: start transmit
+    * `ST = 1'b0`: dont transmit data
+    * `ST = 1'b1`: otherwise
+
+* EN: spi core enable
+    * `EN = 1'b0`: enable spi core
+    * `EN = 1'b1`: otherwise
+
+* RXIE: receive interrupt enable
+    * `RXIE = 1'b0`: disable receieve interrupt
+    * `RXIE = 1'b1`: otherwise
+
+* TXIE: transmit interrupt enable
+    * `TXIE = 1'b0`: disable transmit interrupt
+    * `TXIE = 1'b1`: otherwise
+
 #### Divide Reigster
 | bit | access  | description |
 |:---:|:-------:| :---------: |
 | `[31:16]` | none | reserved |
 | `[15:0]` | RW | DIV |
 
-reset value: `depend on specific shuttle`
+reset value: `0x000_0000`
 
+* DIV: 16-bit clock division value
 
 #### Command Address Length Reigster
 | bit | access  | description |
@@ -96,8 +167,9 @@ reset value: `depend on specific shuttle`
 | `[31:16]` | none | reserved |
 | `[15:0]` | WO | CAL |
 
-reset value: `depend on specific shuttle`
+reset value: `0x0000_0000`
 
+* CAL: command address transmit length
 
 #### Transmit Receive Length Reigster
 | bit | access  | description |
@@ -105,17 +177,27 @@ reset value: `depend on specific shuttle`
 | `[31:16]` | none | reserved |
 | `[15:0]` | WO | TRL |
 
-reset value: `depend on specific shuttle`
+reset value: `0x0000_0000`
+
+* TRL: transmit receive length
 
 #### Transmit Register
 | bit | access  | description |
 |:---:|:-------:| :---------: |
 | `[31:0]` | WO | TXDATA |
 
+reset value: `none`
+
+* TXDATA: transmit data
+
 #### Receive Register
 | bit | access  | description |
 |:---:|:-------:| :---------: |
 | `[31:0]` | RO | RXDATA |
+
+reset value: `0x0000_0000`
+
+* RXDTA: receive data
 
 #### State Register
 | bit | access  | description |
@@ -127,7 +209,27 @@ reset value: `depend on specific shuttle`
 | `[1:1]` | RO | RXIF |
 | `[0:0]` | RO | TXIF |
 
+reset value: `0x0000_0000`
 
+* RETY: receive fifo empty
+    * `RETY = 1'b0`: receive fifo is not empty
+    * `RETY = 1'b1`: otherwise
+
+* TFUL: transmit fifo full
+    * `TFUL = 1'b0`: transmit fifo is not full
+    * `TFUL = 1'b1`: otherwise
+
+* BUSY: transmit busy
+    * `BUSY = 1'b0`: transmit in progress
+    * `BUSY = 1'b1`: otherwise
+
+* RXIF: receive interrupt flag
+    * `RXIF = 1'b0`: dont trigger receive interrupt
+    * `RXIF = 1'b1`: otherwise
+
+* TXIF: transmit interrupt flag
+    * `RXIF = 1'b0`: dont trigger transmit interrupt
+    * `RXIF = 1'b1`: otherwise
 
 ### Program Guide
 The software operation of `spi` is simple. These registers can be accessed by 4-byte aligned read and write. C-like pseudocode read operation:
