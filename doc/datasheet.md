@@ -232,20 +232,39 @@ reset value: `0x0000_0000`
     * `RXIF = 1'b1`: otherwise
 
 ### Program Guide
-The software operation of `spi` is simple. These registers can be accessed by 4-byte aligned read and write. C-like pseudocode read operation:
+These registers can be accessed by 4-byte aligned read and write. C-like pseudocode standard spi write operation to w25q128 nor flash:
 ```c
-uint32_t val;
-val = spi.SYS // read the sys register
-val = spi.IDL // read the idl register
-val = spi.IDH // read the idh register
+// mode 0(CPOL = 0 CPHA = 0)
+spi.DIV = DIV_32_bit           // set clock division
+spi.CTRL1.ASS = 1              // hardware slave select mode
+spi.CTRL2.NSS[0] = 1           // use the one slave select bit
+spi.CTRL2.EN = 0               // clear fifo
+spi.CTRL2.EN = 1               // enter in normal mode
+spi.TXR = 0x06                 // set write enable command
+spi.CTRL2.[NSS[0], ST, EN] = 1 // start transmit
+...
+spi.CTRL1.ASS = 1
+spi.CTRL1.[RDTB, TDTB] = 3     // set transmit block size to 32-bit
+spi.TXR = 0x02                 // set page program command
+
+for (int i = 0; i < WRITE_DATA_NUM; ++i)
+    spi.TXR = WRITE_VALUE
+
+spi.CAL = 0
+spi.TRL = WRITE_DATA_NUM + 1
+spi.CTRL2.[NSS[0], ST, EN] = 1 // start transmit
 
 ```
-write operation:
+
+read operation:
 ```c
-uint32_t val = value_to_be_written;
-spi.SYS = val // write the sys register
-spi.IDL = val // write the idl register
-spi.IDH = val // write the idh register
+spi.TXR = 0x03                       // set read command
+spi.CAL = WRITE_DATA_NUM
+spi.TRL = WRITE_DATA_NUM + 1
+spi.CTRL2.[NSS[0], RWM, ST, EN] = 1  // start read data
+
+for (int i = 0; i < WRITE_DATA_NUM; ++i)
+    uint32_t recv_val = spi.RXR
 
 ```
 
