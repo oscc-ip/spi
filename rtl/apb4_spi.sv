@@ -87,7 +87,7 @@ module apb4_spi #(
   assign spi.irq_o       = s_bit_txif | s_bit_rxif;
 
   assign s_spi_ctrl1_en  = s_apb4_wr_hdshk && s_apb4_addr == `SPI_CTRL1 && ~s_busy;
-  assign s_spi_ctrl1_d   = s_spi_ctrl1_en ? apb4.pwdata[`SPI_CTRL1_WIDTH-1:0] : s_spi_ctrl1_q;
+  assign s_spi_ctrl1_d   = apb4.pwdata[`SPI_CTRL1_WIDTH-1:0];
   dffer #(`SPI_CTRL1_WIDTH) u_spi_ctrl1_dffer (
       apb4.pclk,
       apb4.presetn,
@@ -114,7 +114,7 @@ module apb4_spi #(
   );
 
   assign s_spi_div_en = s_apb4_wr_hdshk && s_apb4_addr == `SPI_DIV && ~s_busy;
-  assign s_spi_div_d  = s_spi_div_en ? apb4.pwdata[`SPI_DIV_WIDTH-1:0] : s_spi_div_q;
+  assign s_spi_div_d  = apb4.pwdata[`SPI_DIV_WIDTH-1:0];
   dffer #(`SPI_DIV_WIDTH) u_spi_div_dffer (
       apb4.pclk,
       apb4.presetn,
@@ -124,7 +124,7 @@ module apb4_spi #(
   );
 
   assign s_spi_cal_en = s_apb4_wr_hdshk && s_apb4_addr == `SPI_CAL && ~s_busy;
-  assign s_spi_cal_d  = s_spi_cal_en ? apb4.pwdata[`SPI_CAL_WIDTH-1:0] : s_spi_cal_q;
+  assign s_spi_cal_d  = apb4.pwdata[`SPI_CAL_WIDTH-1:0];
   dffer #(`SPI_CAL_WIDTH) u_spi_cal_dffer (
       apb4.pclk,
       apb4.presetn,
@@ -148,8 +148,8 @@ module apb4_spi #(
   end
 
   always_comb begin
-    s_spi_stat_d[4] = ~s_rx_pop_valid;
-    s_spi_stat_d[3] = ~s_tx_push_ready;
+    s_spi_stat_d[4] = s_rx_empty;
+    s_spi_stat_d[3] = s_tx_full;
     s_spi_stat_d[2] = s_busy;
     if ((s_bit_txif || s_bit_rxif) && s_apb4_rd_hdshk && s_apb4_addr == `SPI_STAT) begin
       s_spi_stat_d[1:0] = 2'b0;
