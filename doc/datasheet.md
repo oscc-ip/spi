@@ -127,13 +127,15 @@ reset value: `0x0000_0000`
 | `[0:0]` | RW | TXIE |
 
 
-* SNM:
+* SNM: serial data numuber
 
 * CSV: 4-bit chip select reverse
 
 * NSS: 4-bit software slave select
 
-* RWM:
+* RWM: read write mode
+    * `RWM = 1'b0`: write only mode
+    * `RWM = 1'b1`: write/read mode
 
 * ST: start transmit
     * `ST = 1'b0`: dont transmit data
@@ -253,7 +255,6 @@ for (int i = 0; i < WRITE_DATA_NUM; ++i)
 spi.CAL = 0
 spi.TRL = WRITE_DATA_NUM + 1
 spi.CTRL2.[NSS[0], ST, EN] = 1 // start transmit
-
 ```
 
 read operation:
