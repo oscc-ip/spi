@@ -176,6 +176,7 @@ module spi_core (
               default:       s_tran_cnt_d = 7'd32;
             endcase
           end
+          default: s_tran_cnt_d = 7'd8;
         endcase
       end
     end
