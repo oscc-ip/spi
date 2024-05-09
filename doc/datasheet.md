@@ -237,36 +237,41 @@ reset value: `0x0000_0000`
 These registers can be accessed by 4-byte aligned read and write. C-like pseudocode standard spi write operation to w25q128 nor flash:
 ```c
 // mode 0(CPOL = 0 CPHA = 0)
-spi.DIV = DIV_32_bit           // set clock division
-spi.CTRL1.ASS = 1              // hardware slave select mode
-spi.CTRL2.NSS[0] = 1           // use the one slave select bit
-spi.CTRL2.EN = 0               // clear fifo
-spi.CTRL2.EN = 1               // enter in normal mode
-spi.TXR = 0x06                 // set write enable command
-spi.CTRL2.[NSS[0], ST, EN] = 1 // start transmit
+spi.DIV = DIV_32_bit                   // set clock division
+spi.CTRL1.ASS = 1                      // hardware slave select mode
+spi.CTRL2.NSS[0] = 1                   // use the one slave select bit
+spi.CTRL2.EN = 0                       // clear fifo
+spi.CTRL2.EN = 1                       // enter in normal mode
+spi.TXR = 0x06                         // set write enable command
+spi.CTRL2.[NSS[0], ST, EN] = 1         // start transmit
 ...
 spi.CTRL1.ASS = 1
-spi.CTRL1.[RDTB, TDTB] = 3     // set transmit block size to 32-bit
-spi.TXR = 0x02                 // set page program command
+spi.CTRL1.[RDTB, TDTB] = 3             // set transmit block size to 32-bit
+spi.TXR = (0x02 << 24) | PAGE_24_bit   // set page program + page addr
 
-for (int i = 0; i < WRITE_DATA_NUM; ++i)
+for (int i = 0; i < WRITE_DATA_NUM; ++i) {
+    while(spi.STAT.TFUL == 1);         // wait trans fifo is no full
     spi.TXR = WRITE_VALUE
+}
 
 spi.CAL = 0
 spi.TRL = WRITE_DATA_NUM + 1
-spi.CTRL2.[NSS[0], ST, EN] = 1 // start transmit
+spi.CTRL2.[NSS[0], ST, EN] = 1         // start transmit
+
+while(spi.STAT.busy == 1);             // wait data transmit done
 ```
 
 read operation:
 ```c
-spi.TXR = 0x03                       // set read command
+spi.TXR = (0x03 << 24) | PAGE_24_bit   // set read command + page addr
 spi.CAL = WRITE_DATA_NUM
 spi.TRL = WRITE_DATA_NUM + 1
-spi.CTRL2.[NSS[0], RWM, ST, EN] = 1  // start read data
+spi.CTRL2.[NSS[0], RWM, ST, EN] = 1    // start read data
 
-for (int i = 0; i < WRITE_DATA_NUM; ++i)
+for (int i = 0; i < WRITE_DATA_NUM; ++i) {
+    while(spi.STAT.RETY == 1);         // wait recv fifo is no empty
     uint32_t recv_val = spi.RXR
-
+}
 ```
 
 ### Resoureces
