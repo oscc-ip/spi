@@ -249,7 +249,7 @@ module spi_core (
 
   // std spi tx
   assign tx_ready_o = s_st_re_trg || s_tran_done;
-  for (genvar i = 1; i <= 4; i++) begin
+  for (genvar i = 1; i <= 4; i++) begin : SPI_TX_SHIFT_ONE_BLOCK
     shift_reg #(
         .DATA_WIDTH(8 * i),
         .SHIFT_NUM (1)
@@ -268,7 +268,7 @@ module spi_core (
   end
 
   // dual spi tx
-  for (genvar i = 1; i <= 4; i++) begin
+  for (genvar i = 1; i <= 4; i++) begin : SPI_TX_SHIFT_TWO_BLOCK
     shift_reg #(
         .DATA_WIDTH(8 * i),
         .SHIFT_NUM (2)
@@ -289,7 +289,7 @@ module spi_core (
   end
 
   // quad spi tx
-  for (genvar i = 1; i <= 4; i++) begin
+  for (genvar i = 1; i <= 4; i++) begin : SPI_TX_SHIFT_FOUR_BLOCK
     shift_reg #(
         .DATA_WIDTH(8 * i),
         .SHIFT_NUM (4)
@@ -325,7 +325,7 @@ module spi_core (
   end
 
   // std spi rx
-  for (genvar i = 1; i <= 4; i++) begin
+  for (genvar i = 1; i <= 4; i++) begin : SPI_RX_SHIFT_ONE_BLOCK
     shift_reg #(
         .DATA_WIDTH(8 * i),
         .SHIFT_NUM (1)
@@ -349,7 +349,7 @@ module spi_core (
   end
 
   // dual spi rx
-  for (genvar i = 1; i <= 4; i++) begin
+  for (genvar i = 1; i <= 4; i++) begin : SPI_RX_SHIFT_TWO_BLOCK
     shift_reg #(
         .DATA_WIDTH(8 * i),
         .SHIFT_NUM (2)
@@ -373,7 +373,7 @@ module spi_core (
   end
 
   // quad spi rx
-  for (genvar i = 1; i <= 4; i++) begin
+  for (genvar i = 1; i <= 4; i++) begin : SPI_RX_SHIFT_FOUR_BLOCK
     shift_reg #(
         .DATA_WIDTH(8 * i),
         .SHIFT_NUM (4)
