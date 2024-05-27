@@ -224,12 +224,12 @@ reg [15:0] file_length;
 `define SRL  8
 `define SRP  7
 `define SEC    6
-`define TB    5
-`define BP2   4
-`define BP1   3
-`define BP0   2
-`define WEL   1
-`define WIP   0
+`define W25Q128JVxIM_TB    5
+`define W25Q128JVxIM_BP2   4
+`define W25Q128JVxIM_BP1   3
+`define W25Q128JVxIM_BP0   2
+`define W25Q128JVxIM_WEL   1
+`define W25Q128JVxIM_WIP   0
 
 // Required for specify block
 wire flag_quad_mode = status_reg[`QE];
@@ -414,7 +414,7 @@ begin :read_opcode
 
         `CMD_SET_READ_PARAM :
         begin
-            if(!status_reg[`WIP] && !flag_power_down && flag_qpi_mode)
+            if(!status_reg[`W25Q128JVxIM_WIP] && !flag_power_down && flag_qpi_mode)
             begin
                 input_byte(read_param_reg_shadow);
                 flag_set_read_param = 1;
@@ -425,7 +425,7 @@ begin :read_opcode
 
         `CMD_ENABLE_QPI :
         begin
-            if(!status_reg[`WIP] && !flag_power_down)
+            if(!status_reg[`W25Q128JVxIM_WIP] && !flag_power_down)
             begin
                 if(status_reg[`QE] == 1)
                     flag_qpi_mode = 1;
@@ -457,7 +457,7 @@ begin :read_opcode
 
         `CMD_DEEP_POWERDOWN :
         begin
-            if(!status_reg[`WIP] && !flag_power_down)
+            if(!status_reg[`W25Q128JVxIM_WIP] && !flag_power_down)
             begin
                 flag_power_down = 1;
                 @(posedge CLK);
@@ -468,7 +468,7 @@ begin :read_opcode
 
         `CMD_READ_SIGNATURE :
         begin
-            if(!status_reg[`WIP])
+            if(!status_reg[`W25Q128JVxIM_WIP])
             begin
                 flag_power_up_exec = 1;
                 input_byte(null_reg);
@@ -484,7 +484,7 @@ begin :read_opcode
 
         `CMD_READ_JEDEC_ID :
         begin
-            if(!status_reg[`WIP] && !flag_power_down)
+            if(!status_reg[`W25Q128JVxIM_WIP] && !flag_power_down)
             begin
                 output_byte(MANUFACTURER);
                 output_byte(JEDEC_ID_HI);
@@ -494,7 +494,7 @@ begin :read_opcode
 
         `CMD_READ_ID :
         begin
-            if(!status_reg[`WIP] && !flag_power_down)
+            if(!status_reg[`W25Q128JVxIM_WIP] && !flag_power_down)
             begin
                 byte_address = 0;
                 input_byte(byte_address[23:16]);
@@ -518,7 +518,7 @@ begin :read_opcode
 
         `CMD_READ_ID_DUAL :
         begin
-            if(!status_reg[`WIP] && !flag_power_down)
+            if(!status_reg[`W25Q128JVxIM_WIP] && !flag_power_down)
             begin
                 byte_address = 0;
                 input_byte_dual(byte_address[23:16]);
@@ -543,7 +543,7 @@ begin :read_opcode
 
         `CMD_READ_ID_QUAD :
         begin
-            if(!status_reg[`WIP] && !flag_power_down && status_reg[`QE])
+            if(!status_reg[`W25Q128JVxIM_WIP] && !flag_power_down && status_reg[`QE])
             begin
                 byte_address = 0;
                 input_byte_quad(byte_address[23:16]);
@@ -570,7 +570,7 @@ begin :read_opcode
 
         `CMD_READ_UNIQUE_ID :
         begin
-            if(!status_reg[`WIP] && !flag_power_down)
+            if(!status_reg[`W25Q128JVxIM_WIP] && !flag_power_down)
             begin
                 input_byte(null_reg);
                 input_byte(null_reg);
@@ -596,7 +596,7 @@ begin :read_opcode
             // $display("status0: %d %d %d", flag_power_down, WPn, status_reg[`QE]);
             // if((!flag_power_down) && (WPn || status_reg[`QE]))
             if(!flag_power_down) begin
-                status_reg[`WEL] = 1;
+                status_reg[`W25Q128JVxIM_WEL] = 1;
                 $display("status_reg[15:8]: %h", status_reg[15:8]);
             end
         end
@@ -610,7 +610,7 @@ begin :read_opcode
         `CMD_WRITE_DISABLE :
         begin
             if(!flag_power_down)
-                status_reg[`WEL] = 0;
+                status_reg[`W25Q128JVxIM_WEL] = 0;
         end
 
         `CMD_READ_STATUS :
@@ -649,7 +649,7 @@ begin :read_opcode
 
         `CMD_WRITE_STATUS :
         begin
-            if(!status_reg[`WIP] && (status_reg[`WEL] || flag_volatile_sr_write) && !flag_power_down && !status_reg[`SUS])
+            if(!status_reg[`W25Q128JVxIM_WIP] && (status_reg[`W25Q128JVxIM_WEL] || flag_volatile_sr_write) && !flag_power_down && !status_reg[`SUS])
             begin
                 flag_read_op_reg = 1'b0;
                 case ({status_reg[`SRL],status_reg[`SRP]})
@@ -685,7 +685,7 @@ begin :read_opcode
 
         `CMD_WRITE_STATUS2 :
         begin
-            if(!status_reg[`WIP] && (status_reg[`WEL] || flag_volatile_sr_write) && !flag_power_down && !status_reg[`SUS])
+            if(!status_reg[`W25Q128JVxIM_WIP] && (status_reg[`W25Q128JVxIM_WEL] || flag_volatile_sr_write) && !flag_power_down && !status_reg[`SUS])
             begin
                 $display("`CMD_WRITE_STATUS2");
                 flag_read_op_reg = 1'b0;
@@ -715,7 +715,7 @@ begin :read_opcode
 
         `CMD_WRITE_STATUS3 :
         begin
-            if(!status_reg[`WIP] && (status_reg[`WEL] || flag_volatile_sr_write) && !flag_power_down && !status_reg[`SUS])
+            if(!status_reg[`W25Q128JVxIM_WIP] && (status_reg[`W25Q128JVxIM_WEL] || flag_volatile_sr_write) && !flag_power_down && !status_reg[`SUS])
             begin
                 flag_read_op_reg = 1'b0;
                 case ({status_reg[`SRL],status_reg[`SRP]})
@@ -745,8 +745,8 @@ begin :read_opcode
 
         `CMD_PAGE_PROGRAM :
         begin
-            // $display("status1: %d %d %d", status_reg[`WEL], !status_reg[`SUS], !flag_power_down);
-            if(status_reg[`WEL] && !status_reg[`SUS] && !flag_power_down)
+            // $display("status1: %d %d %d", status_reg[`W25Q128JVxIM_WEL], !status_reg[`SUS], !flag_power_down);
+            if(status_reg[`W25Q128JVxIM_WEL] && !status_reg[`SUS] && !flag_power_down)
             begin
                 // $display("status");
                 flag_read_op_reg = 1'b0;
@@ -756,8 +756,8 @@ begin :read_opcode
 
         `CMD_PAGE_PROGRAM_QUAD :
         begin
-            $display("CMD_PAGE_PROGRAM_QUAD: %h %h %h %h", status_reg[`WEL], status_reg[`SUS], status_reg[`QE], flag_power_down);
-            if(status_reg[`WEL]&& !status_reg[`SUS] && status_reg[`QE] && !flag_power_down)
+            $display("CMD_PAGE_PROGRAM_QUAD: %h %h %h %h", status_reg[`W25Q128JVxIM_WEL], status_reg[`SUS], status_reg[`QE], flag_power_down);
+            if(status_reg[`W25Q128JVxIM_WEL]&& !status_reg[`SUS] && status_reg[`QE] && !flag_power_down)
             begin
                 flag_read_op_reg = 1'b0;
                 $display("CMD_PAGE_PROGRAM_QUAD2");
@@ -797,7 +797,7 @@ begin :read_opcode
 
         `CMD_SECTOR_ERASE :
         begin
-            if(status_reg[`WEL] && !flag_power_down && !status_reg[`SUS])
+            if(status_reg[`W25Q128JVxIM_WEL] && !flag_power_down && !status_reg[`SUS])
             begin
                 flag_read_op_reg = 1'b0;
 
@@ -815,7 +815,7 @@ begin :read_opcode
 
         `CMD_HALF_BLOCK_ERASE :
         begin
-            if(status_reg[`WEL] && !flag_power_down && !status_reg[`SUS])
+            if(status_reg[`W25Q128JVxIM_WEL] && !flag_power_down && !status_reg[`SUS])
             begin
                 flag_read_op_reg = 1'b0;
 
@@ -833,7 +833,7 @@ begin :read_opcode
 
         `CMD_BLOCK_ERASE :
         begin
-            if(status_reg[`WEL] && !flag_power_down && !status_reg[`SUS])
+            if(status_reg[`W25Q128JVxIM_WEL] && !flag_power_down && !status_reg[`SUS])
             begin
                 flag_read_op_reg = 1'b0;
 
@@ -851,10 +851,10 @@ begin :read_opcode
 
         `CMD_BULK_ERASE, `CMD_BULK_ERASE2 :
         begin
-            if(status_reg[`WEL] && !flag_power_down && !status_reg[`SUS])
+            if(status_reg[`W25Q128JVxIM_WEL] && !flag_power_down && !status_reg[`SUS])
             begin
                 flag_read_op_reg = 1'b0;
-                case ({status_reg[`BP0],status_reg[`BP1]})
+                case ({status_reg[`W25Q128JVxIM_BP0],status_reg[`W25Q128JVxIM_BP1]})
                     2'b00 :
                     begin
                         flag_erase_bulk = 1;
@@ -869,7 +869,7 @@ begin :read_opcode
 
         `CMD_READ_DATA :
         begin
-            if(!status_reg[`WIP] && !flag_power_down)
+            if(!status_reg[`W25Q128JVxIM_WIP] && !flag_power_down)
             begin
                 flag_slow_read_reg = 1'b1;
                 input_byte(byte_address[23:16]);
@@ -893,7 +893,7 @@ begin :read_opcode
 
         `CMD_READ_DATA_FAST_DTR :
         begin
-            if(!status_reg[`WIP] && !flag_power_down)
+            if(!status_reg[`W25Q128JVxIM_WIP] && !flag_power_down)
             begin
 
                 input_byte_DTR(byte_address[23:16]);
@@ -917,7 +917,7 @@ begin :read_opcode
 
         `CMD_READ_DATA_FAST_DUAL_IO_DTR :
         begin
-            if(!status_reg[`WIP] && !flag_power_down)
+            if(!status_reg[`W25Q128JVxIM_WIP] && !flag_power_down)
             begin
 
                 input_byte_dual_DTR(byte_address[23:16]);
@@ -942,7 +942,7 @@ begin :read_opcode
 
         `CMD_READ_DATA_FAST_QUAD_IO_DTR :
         begin
-            if(!status_reg[`WIP] && !flag_power_down && status_reg[`QE])
+            if(!status_reg[`W25Q128JVxIM_WIP] && !flag_power_down && status_reg[`QE])
             begin
 
                 input_byte_quad_DTR(byte_address[23:16]);
@@ -967,7 +967,7 @@ begin :read_opcode
 
         `CMD_READ_DATA_FAST_DTR_WRAP :
         begin
-            if(!status_reg[`WIP] && !flag_power_down)
+            if(!status_reg[`W25Q128JVxIM_WIP] && !flag_power_down)
             begin
 
                 input_byte_quad_DTR(byte_address[23:16]);
@@ -1028,7 +1028,7 @@ begin :read_opcode
 
         `CMD_SET_BURST_WRAP :
         begin
-            if(!status_reg[`WIP] && !flag_power_down && status_reg[`QE])
+            if(!status_reg[`W25Q128JVxIM_WIP] && !flag_power_down && status_reg[`QE])
             begin
                 input_byte_quad(temp[7:0]);
                 input_byte_quad(temp[7:0]);
@@ -1059,7 +1059,7 @@ begin :read_opcode
 
         `CMD_SREG_ERASE :
         begin
-            if(status_reg[`WEL] && !flag_power_down && !status_reg[`SUS])
+            if(status_reg[`W25Q128JVxIM_WEL] && !flag_power_down && !status_reg[`SUS])
             begin
                 flag_read_op_reg = 1'b0;
                 input_byte(byte_address[23:16]);
@@ -1100,11 +1100,11 @@ begin :read_opcode
 
         `CMD_SREG_PROGRAM :
         begin
-            if(status_reg[`WEL] && !flag_power_down && !status_reg[`SUS])
+            if(status_reg[`W25Q128JVxIM_WEL] && !flag_power_down && !status_reg[`SUS])
             begin
                 flag_read_op_reg = 1'b0;
                 begin
-                    if(!status_reg[`WIP])
+                    if(!status_reg[`W25Q128JVxIM_WIP])
                     begin
                         input_byte(prog_byte_address[23:16]);
                         input_byte(prog_byte_address[15:8]);
@@ -1130,7 +1130,7 @@ begin :read_opcode
 
         `CMD_GLOBAL_BLOCK_LOCK :
         begin
-            if(!status_reg[`WIP] && !flag_power_down)
+            if(!status_reg[`W25Q128JVxIM_WIP] && !flag_power_down)
             begin
                 for(x = 0; x < NUM_LOCKBITS; x=x+1)
                     lock_array[x] = 1;
@@ -1139,7 +1139,7 @@ begin :read_opcode
 
         `CMD_GLOBAL_BLOCK_UNLOCK :
         begin
-            if(!status_reg[`WIP] && !flag_power_down)
+            if(!status_reg[`W25Q128JVxIM_WIP] && !flag_power_down)
             begin
                 for(x = 0; x < NUM_LOCKBITS; x=x+1)
                     lock_array[x] = 0;
@@ -1148,7 +1148,7 @@ begin :read_opcode
 
         `CMD_INDIVIDUAL_LOCK :
         begin
-            if(!status_reg[`WIP] && !flag_power_down)
+            if(!status_reg[`W25Q128JVxIM_WIP] && !flag_power_down)
             begin
 
                 input_byte(byte_address[23:16]);
@@ -1161,7 +1161,7 @@ begin :read_opcode
 
         `CMD_INDIVIDUAL_UNLOCK :
         begin
-            if(!status_reg[`WIP] && !flag_power_down)
+            if(!status_reg[`W25Q128JVxIM_WIP] && !flag_power_down)
             begin
                 input_byte(byte_address[23:16]);
                 input_byte(byte_address[15:8]);
@@ -1173,7 +1173,7 @@ begin :read_opcode
 
         `CMD_READ_BLOCK_LOCK :
         begin
-            if(!status_reg[`WIP] && !flag_power_down)
+            if(!status_reg[`W25Q128JVxIM_WIP] && !flag_power_down)
             begin
                 input_byte(byte_address[23:16]);
                 input_byte(byte_address[15:8]);
@@ -1298,11 +1298,11 @@ task chip_reset;
         status_reg[`QE] = status_reg_otp[`QE];
         status_reg[`SRL] = status_reg_otp[`SRL];
         status_reg[`SRP] = status_reg_otp[`SRP];
-        status_reg[`BP0] = status_reg_otp[`BP0];
-        status_reg[`BP1] = status_reg_otp[`BP1];
-        status_reg[`BP2] = status_reg_otp[`BP2];
+        status_reg[`W25Q128JVxIM_BP0] = status_reg_otp[`W25Q128JVxIM_BP0];
+        status_reg[`W25Q128JVxIM_BP1] = status_reg_otp[`W25Q128JVxIM_BP1];
+        status_reg[`W25Q128JVxIM_BP2] = status_reg_otp[`W25Q128JVxIM_BP2];
         status_reg[`SEC] = status_reg_otp[`SEC];
-        status_reg[`TB] = status_reg_otp[`TB];
+        status_reg[`W25Q128JVxIM_TB] = status_reg_otp[`W25Q128JVxIM_TB];
         status_reg[`CMPB] = status_reg_otp[`CMPB];
         status_reg[`WPS] = status_reg_otp[`WPS];
         status_reg[`DRV0] = status_reg_otp[`DRV0];
@@ -1976,7 +1976,7 @@ function write_protected;
             write_protected = lock_array[lockbit_index(byte_address)];
         else
         begin
-            casez ({status_reg[`SEC], status_reg[`TB],status_reg[`BP2],status_reg[`BP1],status_reg[`BP0]})
+            casez ({status_reg[`SEC], status_reg[`W25Q128JVxIM_TB],status_reg[`W25Q128JVxIM_BP2],status_reg[`W25Q128JVxIM_BP1],status_reg[`W25Q128JVxIM_BP0]})
                 5'b??000 :
                     write_protected = 1'b0 ^ status_reg[`CMPB];
                 5'b00001 :
@@ -2230,7 +2230,7 @@ task read_page;
     integer x;
 
     begin
-        if(!status_reg[`WIP])
+        if(!status_reg[`W25Q128JVxIM_WIP])
         begin
             input_byte(byte_address[23:16]);
             input_byte(byte_address[15:8]);
@@ -2306,7 +2306,7 @@ endtask
 task read_page_dualio;
     begin
 
-        if(!status_reg[`WIP])
+        if(!status_reg[`W25Q128JVxIM_WIP])
         begin
 
             input_byte_dual(byte_address[23:16]);
@@ -2335,7 +2335,7 @@ endtask
 task read_page_quadio;
     input [7:0] cmd;
     integer x;
-    // $display("%t read page quadio, status_reg[`WIP]: %d", $time, status_reg[`WIP]);
+    // $display("%t read page quadio, status_reg[`W25Q128JVxIM_WIP]: %d", $time, status_reg[`W25Q128JVxIM_WIP]);
     begin
 
 
@@ -2344,7 +2344,7 @@ task read_page_quadio;
         input_byte_quad(byte_address[7:0]);
 
 
-        if(!status_reg[`WIP])
+        if(!status_reg[`W25Q128JVxIM_WIP])
         begin
             case (cmd)
                 `CMD_READ_DATA_FAST_QUAD_IO :
@@ -2412,7 +2412,7 @@ task write_page;
     integer address;
 
     begin
-        if(!status_reg[`WIP])
+        if(!status_reg[`W25Q128JVxIM_WIP])
         begin
             input_byte(prog_byte_address[23:16]);
             input_byte(prog_byte_address[15:8]);
@@ -2535,7 +2535,7 @@ begin :reset
     @(posedge CSn);
     if((flag_reset == 1) && (flag_write_status_reg == 0))  // Execute command, except if within a write status register command.
     begin
-        status_reg[`WIP] = 1;
+        status_reg[`W25Q128JVxIM_WIP] = 1;
         flag_reset_condition = 1;
         #tRES1;
         chip_reset();
@@ -2608,8 +2608,8 @@ begin :erase_suspend
         status_reg[`SUS] = 1;
         wait_reset(tSUS);
         flag_suspend_enabled = 1'b1;
-        status_reg[`WIP] = 0;
-        status_reg[`WEL] = 0;
+        status_reg[`W25Q128JVxIM_WIP] = 0;
+        status_reg[`W25Q128JVxIM_WEL] = 0;
 
     end
 end
@@ -2630,8 +2630,8 @@ begin :erase_resume
         flag_suspend_enabled = 1'b0;
         flag_suspend = 1'b0;
         flag_resume = 1'b0;
-        status_reg[`WEL] = 1;
-        status_reg[`WIP] = 1;
+        status_reg[`W25Q128JVxIM_WEL] = 1;
+        status_reg[`W25Q128JVxIM_WIP] = 1;
 
     end
 end
@@ -2649,15 +2649,15 @@ begin :erase_sector
     @(posedge CSn);                    // Wait for CSn to go high
     if(flag_erase_sector == 1)
     begin
-        status_reg[`WIP] = 1;
+        status_reg[`W25Q128JVxIM_WIP] = 1;
 
         wait_reset_suspend(tSE);
 
         for(x = 0; x < SECTORSIZE; x=x+1)
             memory[(byte_address[23:12] * SECTORSIZE) + x] = 8'hff;
 
-        status_reg[`WIP] = 0;
-        status_reg[`WEL] = 0;
+        status_reg[`W25Q128JVxIM_WIP] = 0;
+        status_reg[`W25Q128JVxIM_WEL] = 0;
     end
     flag_erase_sector = 0;
 end
@@ -2675,7 +2675,7 @@ begin :erase_secsi_sector
     @(posedge CSn);                    // Wait for CSn to go high
     if(flag_erase_secsi_sector == 1)
     begin
-        status_reg[`WIP] = 1;
+        status_reg[`W25Q128JVxIM_WIP] = 1;
 
         case(byte_address[23:8])
             16'h10 :
@@ -2703,8 +2703,8 @@ begin :erase_secsi_sector
             end
         endcase
 
-        status_reg[`WIP] = 0;
-        status_reg[`WEL] = 0;
+        status_reg[`W25Q128JVxIM_WIP] = 0;
+        status_reg[`W25Q128JVxIM_WEL] = 0;
     end
     flag_erase_secsi_sector = 0;
 end
@@ -2724,15 +2724,15 @@ begin :erase_block
     @(posedge CSn);                        // Wait for CSn to go high
     if(flag_erase_block == 1)
     begin
-        status_reg[`WIP] = 1;
+        status_reg[`W25Q128JVxIM_WIP] = 1;
 
         wait_reset_suspend(tBE2);
 
         for(x = 0; x < BLOCKSIZE; x=x+1)
             memory[(byte_address[23:16] * BLOCKSIZE) + x] = 8'hff;
 
-        status_reg[`WIP] = 0;
-        status_reg[`WEL] = 0;
+        status_reg[`W25Q128JVxIM_WIP] = 0;
+        status_reg[`W25Q128JVxIM_WEL] = 0;
     end
     flag_erase_block = 0;
 end
@@ -2750,15 +2750,15 @@ begin :erase_half_block
     @(posedge CSn);                       // Wait for CSn to go high
     if(flag_erase_half_block == 1)
     begin
-        status_reg[`WIP] = 1;
+        status_reg[`W25Q128JVxIM_WIP] = 1;
 
         wait_reset_suspend(tBE1);
 
         for(x = 0; x < HALFBLOCKSIZE; x=x+1)
             memory[(byte_address[23:15] * HALFBLOCKSIZE) + x] = 8'hff;
 
-        status_reg[`WIP] = 0;
-        status_reg[`WEL] = 0;
+        status_reg[`W25Q128JVxIM_WIP] = 0;
+        status_reg[`W25Q128JVxIM_WEL] = 0;
     end
     flag_erase_half_block = 0;
 end
@@ -2778,7 +2778,7 @@ begin :erase_bulk
     @(posedge CSn);                // Wait for CSn to go high
     if(flag_erase_bulk == 1)
     begin
-        status_reg[`WIP] = 1;
+        status_reg[`W25Q128JVxIM_WIP] = 1;
 
         for(x = 0; x < 40; x=x+1)
             wait_reset(tCE_40);
@@ -2786,8 +2786,8 @@ begin :erase_bulk
         for(x = 0; x < PAGESIZE * NUM_PAGES; x=x+1)
             memory[x] = 8'hff;
 
-        status_reg[`WIP] = 0;
-        status_reg[`WEL] = 0;
+        status_reg[`W25Q128JVxIM_WIP] = 0;
+        status_reg[`W25Q128JVxIM_WEL] = 0;
     end
     flag_erase_bulk = 0;
 
@@ -2809,7 +2809,7 @@ begin :program_to_page
 
     @(posedge CSn);                  // Wait for CSn to go high
     begin
-        status_reg[`WIP] = 1;
+        status_reg[`W25Q128JVxIM_WIP] = 1;
 
         prog_byte_address[7:0] = 0;
         for(x = 0; x < PAGESIZE; x=x+1)
@@ -2817,8 +2817,8 @@ begin :program_to_page
             memory[prog_byte_address+x] = page_latch[x] & memory[prog_byte_address+x];
             wait_reset_suspend(tPP / PAGESIZE);
         end
-        status_reg[`WIP] = 0;
-        status_reg[`WEL] = 0;
+        status_reg[`W25Q128JVxIM_WIP] = 0;
+        status_reg[`W25Q128JVxIM_WEL] = 0;
     end
     flag_prog_page = 0;
 end
@@ -2835,7 +2835,7 @@ begin :program_to_secsi_page
 
     @(posedge CSn);                         // Wait for CSn to go high
     begin
-        status_reg[`WIP] = 1;
+        status_reg[`W25Q128JVxIM_WIP] = 1;
         prog_byte_address[7:0] = 0;
 
         case(prog_byte_address[23:8])
@@ -2870,8 +2870,8 @@ begin :program_to_secsi_page
             end
         endcase
 
-        status_reg[`WIP] = 0;
-        status_reg[`WEL] = 0;
+        status_reg[`W25Q128JVxIM_WIP] = 0;
+        status_reg[`W25Q128JVxIM_WEL] = 0;
     end
     flag_prog_secsi_page = 0;
 end
@@ -2894,15 +2894,15 @@ begin :write_status_reg
     @(posedge CSn);      // Wait for CSn to go high
     if(flag_write_status_reg == 1)
     begin
-        status_reg[`WIP] = 1;
+        status_reg[`W25Q128JVxIM_WIP] = 1;
         status_reg[`QE] = status_reg_shadow[`QE];
         status_reg[`SRL] = status_reg_shadow[`SRL];
         status_reg[`SRP] = status_reg_shadow[`SRP];
-        status_reg[`BP0] = status_reg_shadow[`BP0];
-        status_reg[`BP1] = status_reg_shadow[`BP1];
-        status_reg[`BP2] = status_reg_shadow[`BP2];
+        status_reg[`W25Q128JVxIM_BP0] = status_reg_shadow[`W25Q128JVxIM_BP0];
+        status_reg[`W25Q128JVxIM_BP1] = status_reg_shadow[`W25Q128JVxIM_BP1];
+        status_reg[`W25Q128JVxIM_BP2] = status_reg_shadow[`W25Q128JVxIM_BP2];
         status_reg[`SEC] = status_reg_shadow[`SEC];
-        status_reg[`TB] = status_reg_shadow[`TB];
+        status_reg[`W25Q128JVxIM_TB] = status_reg_shadow[`W25Q128JVxIM_TB];
         status_reg[`CMPB] = status_reg_shadow[`CMPB];
         status_reg[`WPS] = status_reg_shadow[`WPS];
         status_reg[`DRV0] = status_reg_shadow[`DRV0];
@@ -2922,11 +2922,11 @@ begin :write_status_reg
             status_reg_otp[`QE] = status_reg_shadow[`QE];
             status_reg_otp[`SRL] = status_reg_shadow[`SRL];
             status_reg_otp[`SRP] = status_reg_shadow[`SRP];
-            status_reg_otp[`BP0] = status_reg_shadow[`BP0];
-            status_reg_otp[`BP1] = status_reg_shadow[`BP1];
-            status_reg_otp[`BP2] = status_reg_shadow[`BP2];
+            status_reg_otp[`W25Q128JVxIM_BP0] = status_reg_shadow[`W25Q128JVxIM_BP0];
+            status_reg_otp[`W25Q128JVxIM_BP1] = status_reg_shadow[`W25Q128JVxIM_BP1];
+            status_reg_otp[`W25Q128JVxIM_BP2] = status_reg_shadow[`W25Q128JVxIM_BP2];
             status_reg_otp[`SEC] = status_reg_shadow[`SEC];
-            status_reg_otp[`TB] = status_reg_shadow[`TB];
+            status_reg_otp[`W25Q128JVxIM_TB] = status_reg_shadow[`W25Q128JVxIM_TB];
             status_reg_otp[`CMPB] = status_reg_shadow[`CMPB];
             status_reg_otp[`WPS] = status_reg_shadow[`WPS];
             status_reg_otp[`DRV0] = status_reg_shadow[`DRV0];
@@ -2945,10 +2945,10 @@ begin :write_status_reg
             flag_qpi_mode = 0;
 
 
-        if(status_reg[`WEL])
+        if(status_reg[`W25Q128JVxIM_WEL])
             wait_reset(tW);
-        status_reg[`WIP] = 0;
-        status_reg[`WEL] = 0;
+        status_reg[`W25Q128JVxIM_WIP] = 0;
+        status_reg[`W25Q128JVxIM_WEL] = 0;
         flag_volatile_sr_write = 0;
         flag_write_status_reg = 0;
     end
