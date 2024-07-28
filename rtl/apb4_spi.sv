@@ -44,6 +44,7 @@ module apb4_spi #(
   logic s_tx_push_valid, s_tx_push_ready, s_tx_empty, s_tx_full, s_tx_pop_valid, s_tx_pop_ready;
   logic s_rx_push_valid, s_rx_push_ready, s_rx_empty, s_rx_full, s_rx_pop_valid, s_rx_pop_ready;
   logic [31:0] s_tx_push_data, s_tx_pop_data, s_rx_push_data, s_rx_pop_data;
+  logic [31:0] s_spi_rv_rx;
   logic [LOG_FIFO_DEPTH:0] s_tx_elem, s_rx_elem;
   // spi
   logic s_last, s_pos_edge, s_neg_edge;
