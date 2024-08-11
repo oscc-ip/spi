@@ -273,6 +273,7 @@ for (int i = 0; i < WRITE_DATA_NUM; ++i) {
     uint32_t recv_val = spi.RXR
 }
 ```
+complete driver and test codes in [driver](../driver/) dir.
 
 ### Resoureces
 ### References
