@@ -25,6 +25,7 @@ class SPITest extends APB4Master;
   extern function new(string name = "spi_test", virtual apb4_if.master apb4, virtual spi_if.tb spi);
   extern task automatic test_reset_reg();
   extern task automatic test_wr_rd_reg(input bit [31:0] run_times = 1000);
+  extern task automatic single_8_data_wr_test();
   extern task automatic w25q_std_spi_wr_rd_test();
   extern task automatic w25q_dual_spi_wr_rd_test();
   extern task automatic w25q_quad_spi_wr_rd_test();
@@ -60,6 +61,29 @@ task automatic SPITest::test_wr_rd_reg(input bit [31:0] run_times = 1000);
       this.wr_rd_check(`SPI_CAL_ADDR, "CAL REG", $random & {`SPI_CAL_WIDTH{1'b1}}, Helper::EQUL);
   end
   // verilog_format: on
+endtask
+
+task automatic SPITest::single_8_data_wr_test();
+  $display("[%t]=== [single 8 data wr ] ===", $time);
+  this.write(`SPI_DIV_ADDR, 32'd0 & {`SPI_DIV_WIDTH{1'b1}});
+  this.write(`SPI_CTRL1_ADDR, 32'b00_0000_1000 & {`SPI_CTRL1_WIDTH{1'b1}});
+  this.write(`SPI_CTRL2_ADDR, 32'b0010_0000 & {`SPI_CTRL2_WIDTH{1'b1}});  // clear que
+  this.write(`SPI_CTRL2_ADDR, 32'b0010_0100 & {`SPI_CTRL2_WIDTH{1'b1}});
+  this.write(`SPI_CAL_ADDR, 32'd0);
+  repeat (100) @(posedge this.apb4.pclk);
+
+  this.write(`SPI_TXR_ADDR, 32'h11);
+  this.write(`SPI_TRL_ADDR, 0);
+  this.write(`SPI_CTRL2_ADDR, 32'b0010_1100 & {`SPI_CTRL2_WIDTH{1'b1}});  // start trans
+  do begin
+    this.read(`SPI_STAT_ADDR);
+  end while (super.rd_data[2] == 1'b1);
+  repeat (100) @(posedge this.apb4.pclk);
+
+  this.write(`SPI_TXR_ADDR, 32'h36);
+  this.write(`SPI_TRL_ADDR, 0);
+  this.write(`SPI_CTRL2_ADDR, 32'b0010_1100 & {`SPI_CTRL2_WIDTH{1'b1}});  // start trans
+
 endtask
 
 task automatic SPITest::w25q_std_spi_wr_rd_test();

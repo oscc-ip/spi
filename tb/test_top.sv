@@ -23,7 +23,7 @@ program automatic test_top (
     if ($test$plusargs("WAVE_ON")) begin
       $value$plusargs("WAVE_NAME=%s", wave_name);
       $fsdbDumpfile(wave_name);
-      $fsdbDumpvars(0, u_apb4_spi);
+      $fsdbDumpvars("+all");
     end
   endtask
 
@@ -42,6 +42,7 @@ program automatic test_top (
     spi_hdl.w25q_dual_spi_wr_rd_test();
     spi_hdl.w25q_quad_spi_wr_rd_test();
     spi_hdl.test_irq();
+    spi_hdl.single_8_data_wr_test();
 
     Helper::end_banner();
     #20000 $finish;
