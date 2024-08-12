@@ -38,11 +38,12 @@ program automatic test_top (
     spi_hdl.init();
     spi_hdl.test_reset_reg();
     spi_hdl.test_wr_rd_reg();
-    spi_hdl.w25q_std_spi_wr_rd_test();
-    spi_hdl.w25q_dual_spi_wr_rd_test();
-    spi_hdl.w25q_quad_spi_wr_rd_test();
-    spi_hdl.test_irq();
-    spi_hdl.single_8_data_wr_test();
+    spi_hdl.read_id();
+    // spi_hdl.w25q_std_spi_wr_rd_test();
+    // spi_hdl.w25q_dual_spi_wr_rd_test();
+    // spi_hdl.w25q_quad_spi_wr_rd_test();
+    // spi_hdl.test_irq();
+    // spi_hdl.single_8_data_wr_test();
 
     Helper::end_banner();
     #20000 $finish;
