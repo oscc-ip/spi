@@ -23,9 +23,15 @@ class SPITest extends APB4Master;
   virtual spi_if.tb                            spi;
 
   extern function new(string name = "spi_test", virtual apb4_if.master apb4, virtual spi_if.tb spi);
+  extern task automatic spi_auto_init();
+  extern task automatic spi_wr_dat_8b(input bit [7:0] cmd);
+  extern task automatic spi_wr_dat(input bit [7:0] cmd, input bit [31:0] num, ref bit [7:0] data[]);
+  extern task automatic spi_rd_dat(input bit [7:0] cmd, input bit [31:0] num, ref bit [7:0] data[]);
+  extern task automatic spi_flash_write_done();
+  extern task automatic spi_flash_id_read();
+  extern task automatic spi_flash_sector_erase();
   extern task automatic test_reset_reg();
   extern task automatic test_wr_rd_reg(input bit [31:0] run_times = 1000);
-  extern task automatic read_id();
   extern task automatic single_8_data_wr_test();
   extern task automatic w25q_std_spi_wr_rd_test();
   extern task automatic w25q_dual_spi_wr_rd_test();
@@ -42,6 +48,100 @@ function SPITest::new(string name, virtual apb4_if.master apb4, virtual spi_if.t
   this.apb4   = apb4;
   this.spi    = spi;
 endfunction
+
+task automatic SPITest::spi_auto_init();
+  this.write(`SPI_DIV_ADDR, 32'd0);
+  this.write(`SPI_CTRL1_ADDR, 32'h8);  // auto mode
+  this.write(`SPI_CTRL2_ADDR, 32'h20);  // nss = 0
+  this.write(`SPI_CTRL2_ADDR, 32'h24);  // nss = 0, en = 1
+endtask
+
+task automatic SPITest::spi_wr_dat_8b(input bit [7:0] cmd);
+  do begin
+    this.read(`SPI_STAT_ADDR);
+  end while (super.rd_data[3] == 1);
+  this.write(`SPI_TXR_ADDR, cmd);
+  this.write(`SPI_TRL_ADDR, 32'd0);
+  this.write(`SPI_CTRL2_ADDR, 32'h2C);
+  do begin
+    this.read(`SPI_STAT_ADDR);
+  end while (super.rd_data[2] == 1);
+endtask
+
+
+task automatic SPITest::spi_wr_dat(input bit [7:0] cmd, input bit [31:0] num, ref bit [7:0] data[]);
+  do begin
+    this.read(`SPI_STAT_ADDR);
+  end while (super.rd_data[3] == 1);
+  this.write(`SPI_TXR_ADDR, cmd);
+  this.write(`SPI_CAL_ADDR, 32'd0);
+  this.write(`SPI_TRL_ADDR, num);
+  this.write(`SPI_CTRL2_ADDR, 32'h2C);
+
+  for (int i = 0; i < num; ++i) begin
+    do begin
+      this.read(`SPI_STAT_ADDR);
+    end while (super.rd_data[3] == 1);
+    this.write(`SPI_TXR_ADDR, data[i]);
+  end
+  do begin
+    this.read(`SPI_STAT_ADDR);
+  end while (super.rd_data[2] == 1);
+endtask
+
+task automatic SPITest::spi_rd_dat(input bit [7:0] cmd, input bit [31:0] num, ref bit [7:0] data[]);
+  do begin
+    this.read(`SPI_STAT_ADDR);
+  end while (super.rd_data[3] == 1);
+  this.write(`SPI_TXR_ADDR, cmd);
+  this.write(`SPI_CAL_ADDR, num - 1);
+  this.write(`SPI_TRL_ADDR, num);
+  this.write(`SPI_CTRL2_ADDR, 32'h3C);
+
+  for (int i = 0; i < num; ++i) begin
+    do begin
+      this.read(`SPI_STAT_ADDR);
+    end while (super.rd_data[4] == 1);
+    this.read(`SPI_RXR_ADDR);
+    data[i] = super.rd_data;
+  end
+endtask
+
+task automatic SPITest::spi_flash_write_done();
+  bit [7:0] recv[];
+  do begin
+    // this.spi_rd_dat(8'h05, 1, recv);
+  end while (recv[0][0] == 1'b1);
+endtask
+
+task automatic SPITest::spi_flash_id_read();
+  bit [7:0] recv[] = {0, 0, 0};
+
+  $display("[%t]=== [read id] ===", $time);
+  this.spi_auto_init();
+  repeat (100) @(posedge this.apb4.pclk);
+  this.spi_rd_dat(8'h9F, 3, recv);
+  $display("MANU_ID: %x FLASH_ID: %x\n", recv[0], (recv[1] << 8) | recv[2]);
+endtask
+
+task automatic SPITest::spi_flash_sector_erase();
+  $display("[%t]=== [sector erase] ===", $time);
+  this.write(`SPI_DIV_ADDR, 32'd0 & {`SPI_DIV_WIDTH{1'b1}});
+  this.write(`SPI_CTRL1_ADDR, 32'b00_0000_1000 & {`SPI_CTRL1_WIDTH{1'b1}});
+  this.write(`SPI_CTRL2_ADDR, 32'b0010_0000 & {`SPI_CTRL2_WIDTH{1'b1}});  // clear que
+  this.write(`SPI_CTRL2_ADDR, 32'b0010_0100 & {`SPI_CTRL2_WIDTH{1'b1}});
+  this.write(`SPI_CAL_ADDR, 32'd0);
+  repeat (100) @(posedge this.apb4.pclk);
+  // write enable
+  this.write(`SPI_TXR_ADDR, 32'h06);
+  this.write(`SPI_TRL_ADDR, 0);
+  this.write(`SPI_CTRL2_ADDR, 32'b0010_1100 & {`SPI_CTRL2_WIDTH{1'b1}});  // start trans
+  do begin
+    this.read(`SPI_STAT_ADDR);
+  end while (super.rd_data[2] == 1'b1);
+  repeat (100) @(posedge this.apb4.pclk);
+  spi_flash_write_done();
+endtask
 
 task automatic SPITest::test_reset_reg();
   super.test_reset_reg();
@@ -62,29 +162,6 @@ task automatic SPITest::test_wr_rd_reg(input bit [31:0] run_times = 1000);
       this.wr_rd_check(`SPI_CAL_ADDR, "CAL REG", $random & {`SPI_CAL_WIDTH{1'b1}}, Helper::EQUL);
   end
   // verilog_format: on
-endtask
-
-task automatic SPITest::read_id();
-  $display("[%t]=== [read id] ===", $time);
-  this.write(`SPI_DIV_ADDR, 32'd0 & {`SPI_DIV_WIDTH{1'b1}});
-  this.write(`SPI_CTRL1_ADDR, 32'b00_0000_1000 & {`SPI_CTRL1_WIDTH{1'b1}});
-  this.write(`SPI_CTRL2_ADDR, 32'b0010_0000 & {`SPI_CTRL2_WIDTH{1'b1}});  // clear que
-  this.write(`SPI_CTRL2_ADDR, 32'b0010_0100 & {`SPI_CTRL2_WIDTH{1'b1}});
-  this.write(`SPI_CAL_ADDR, 32'd0);
-  repeat (100) @(posedge this.apb4.pclk);
-  this.write(`SPI_TXR_ADDR, 32'h9F);
-  this.write(`SPI_CAL_ADDR, 2);
-  this.write(`SPI_TRL_ADDR, 3);
-  this.write(`SPI_CTRL2_ADDR, 32'b0011_1100 & {`SPI_CTRL2_WIDTH{1'b1}});  // start trans
-
-  for (int i = 0; i < 3; ++i) begin
-    do begin
-      // $display("%t read stat", $time);
-      this.read(`SPI_STAT_ADDR);
-    end while (super.rd_data[4] == 1'b1);
-    this.read(`SPI_RXR_ADDR);
-    $display("read data: %x", super.rd_data);
-  end
 endtask
 
 task automatic SPITest::single_8_data_wr_test();
