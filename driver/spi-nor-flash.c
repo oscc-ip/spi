@@ -262,18 +262,25 @@ int main(){
     spi_flash_id_read();
     putstr("ass mode page wr/rd test\n");
 
-    // i : [0~4095]
+    for(int i = 0, cur_addr = 0; i < 70; ++i) {
+        spi_flash_sector_erase(cur_addr);
+        cur_addr += 4096;
+    }
+    putstr("sector erase done\n");
+
     tot_cnt = 1;
-    for(int i = 0; i < 1000; ++i) {
-        spi_flash_sector_erase(i);
-        spi_flash_page_write(i, TEST_NUM, ref_data);
-        spi_flash_buf_read(i, TEST_NUM, recv_data);
+    for(int i = 0, cur_addr = 0; i < 1024; ++i) {
+        spi_flash_page_write(cur_addr, TEST_NUM, ref_data);
+        spi_flash_buf_read(cur_addr, TEST_NUM, recv_data);
         check_result(ref_data, recv_data, TEST_NUM);
-        printf("%d iter check done\n", i);
+        printf(" [addr: %x] %d iter check done\n", cur_addr, i);
+        cur_addr += 256;
         ++tot_cnt;
     }
     printf("tot: %d, err: %d\n", tot_cnt * TEST_NUM, err_cnt);
     putstr("ass mode page wr/rd test done\n");
+
+
     putstr("ass mode wr/rd test done\n");
     putstr("test done\n");
 
