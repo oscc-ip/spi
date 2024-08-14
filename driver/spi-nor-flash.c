@@ -38,11 +38,7 @@
 
 #define SPI_FLASH_PAGE_SIZE      256
 
-#define TEST_NUM                 20 // need to < 64
-#define TEST_32B_NUM             6  // need to < 64
-
-#define spi_cs_clr    (SPI_REG_CTRL2 = SPI_REG_CTRL2 | 0x20)
-#define spi_cs_set    (SPI_REG_CTRL2 = SPI_REG_CTRL2 & 0x1FFDF)
+#define TEST_NUM                 60 // need to < 64
 
 // 256   block(64KB)
 // 4096  sector[1 block  -> 16 sector(4KB)]
@@ -260,8 +256,9 @@ int main(){
     timer_init();
     spi_auto_init();
     spi_flash_id_read();
-    putstr("ass mode page wr/rd test\n");
 
+
+    putstr("ass mode page wr/rd test\n");
     for(int i = 0, cur_addr = 0; i < 70; ++i) {
         spi_flash_sector_erase(cur_addr);
         cur_addr += 4096;
@@ -269,6 +266,7 @@ int main(){
     putstr("sector erase done\n");
 
     tot_cnt = 1;
+    err_cnt = 0;
     for(int i = 0, cur_addr = 0; i < 1024; ++i) {
         spi_flash_page_write(cur_addr, TEST_NUM, ref_data);
         spi_flash_buf_read(cur_addr, TEST_NUM, recv_data);
@@ -280,6 +278,26 @@ int main(){
     printf("tot: %d, err: %d\n", tot_cnt * TEST_NUM, err_cnt);
     putstr("ass mode page wr/rd test done\n");
 
+
+    putstr("ass mode random addr wr/rd test\n");
+    for(int i = 0, cur_addr = 0; i < 70; ++i) {
+        spi_flash_sector_erase(cur_addr);
+        cur_addr += 4096;
+    }
+    putstr("sector erase done\n");
+
+    tot_cnt = 1;
+    err_cnt = 0;
+    for(int i = 0, cur_addr = 0; i < 1024; ++i) {
+        spi_flash_buf_write(cur_addr, TEST_NUM, ref_data);
+        spi_flash_buf_read(cur_addr, TEST_NUM, recv_data);
+        check_result(ref_data, recv_data, TEST_NUM);
+        printf(" [addr: %x] %d iter check done\n", cur_addr, i);
+        cur_addr += TEST_NUM;
+        ++tot_cnt;
+    }
+    printf("tot: %d, err: %d\n", tot_cnt * TEST_NUM, err_cnt);
+    putstr("ass mode random addr wr/rd test done\n");
 
     putstr("ass mode wr/rd test done\n");
     putstr("test done\n");
