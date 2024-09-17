@@ -37,9 +37,10 @@ program automatic test_top (
     spi_hdl = new("spi_test", apb4, spi);
     spi_hdl.init();
     spi_hdl.test_reset_reg();
-    spi_hdl.test_wr_rd_reg();
+    // spi_hdl.test_wr_rd_reg();
     // spi_hdl.spi_flash_id_read();
-    spi_hdl.spi_flash_sector_erase(0);
+    // spi_hdl.spi_flash_sector_erase(0);
+    // spi_hdl.manu_send_data();
     // spi_hdl.w25q_std_spi_wr_rd_test();
     // spi_hdl.w25q_dual_spi_wr_rd_test();
     // spi_hdl.w25q_quad_spi_wr_rd_test();

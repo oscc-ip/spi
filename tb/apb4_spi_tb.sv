@@ -60,12 +60,12 @@ module apb4_spi_tb ();
       .spi (u_spi_if.dut)
   );
 
-  W25Q128JVxIM u_W25Q128JVxIM (
-      .CSn  (u_spi_if.spi_nss_o[0]),
-      .CLK  (u_spi_if.spi_sck_o),
-      .DIO  (s_spi_io_pad[0]),
-      .DO   (s_spi_io_pad[1]),
-      .WPn  (s_spi_io_pad[2]),
-      .HOLDn(s_spi_io_pad[3])
-  );
+  // W25Q128JVxIM u_W25Q128JVxIM (
+  //     .CSn  (u_spi_if.spi_nss_o[0]),
+  //     .CLK  (u_spi_if.spi_sck_o),
+  //     .DIO  (s_spi_io_pad[0]),
+  //     .DO   (s_spi_io_pad[1]),
+  //     .WPn  (s_spi_io_pad[2]),
+  //     .HOLDn(s_spi_io_pad[3])
+  // );
 endmodule
