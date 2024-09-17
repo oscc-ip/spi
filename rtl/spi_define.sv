@@ -112,10 +112,19 @@
 `define SPI_DUAL_SPI 2'b01
 `define SPI_QUAD_SPI 2'b10
 
-`define SPI_TRANS_8_BITS  2'b0
-`define SPI_TRANS_16_BITS 2'b0
+`define SPI_TRANS_8_BITS  2'b00
+`define SPI_TRANS_16_BITS 2'b01
 `define SPI_TRANS_24_BITS 2'b10
 `define SPI_TRANS_32_BITS 2'b11
+
+`define SPI_FSM_IDLE  3'b000
+`define SPI_FSM_CMD   3'b001
+`define SPI_FSM_ADDR  3'b010
+`define SPI_FSM_ALTR  3'b011
+`define SPI_FSM_NOP   3'b100
+`define SPI_FSM_WDATA 3'b101
+`define SPI_FSM_RDATA 3'b110
+
 // verilog_format: on
 
 // io0(mosi)

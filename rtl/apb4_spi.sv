@@ -50,7 +50,7 @@ module apb4_spi #(
   logic [1:0] s_bit_dmode, s_bit_dsize;
   logic s_bit_txif, s_bit_rxif;
   // irq
-  logic s_busy, s_tx_irq_trg, s_rx_irq_trg;
+  logic s_tx_irq_trg, s_rx_irq_trg;
   // fifo
   logic s_tx_push_valid, s_tx_push_ready, s_tx_empty, s_tx_full, s_tx_pop_valid, s_tx_pop_ready;
   logic s_rx_push_valid, s_rx_push_ready, s_rx_empty, s_rx_full, s_rx_pop_valid, s_rx_pop_ready;
@@ -58,7 +58,7 @@ module apb4_spi #(
   logic [31:0] s_spi_rv_rx;
   logic [LOG_FIFO_DEPTH:0] s_tx_elem, s_rx_elem;
   // spi
-  logic s_last, s_pos_edge, s_neg_edge;
+  logic s_busy, s_last;
 
   assign s_apb4_addr     = apb4.paddr[5:2];
   assign s_apb4_wr_hdshk = apb4.psel && apb4.penable && apb4.pwrite;
