@@ -50,21 +50,28 @@ module spi_core (
     input  logic [               3:0] spi_io_in_i,
     output logic [               3:0] spi_io_out_o
 );
-  logic s_pos_edge, s_neg_edge;
+  logic s_pos_edge, s_neg_edge, s_tx_trg;
+
   logic [2:0] s_spi_fsm_d, s_spi_fsm_q;
   logic [3:0] s_nss_sel;
+
+  logic       s_tx_multi_shift_1[0:3];
+  logic [1:0] s_tx_multi_shift_2[0:3];
+  logic [3:0] s_tx_multi_shift_4[0:3];
   logic       s_tx_shift_1;
   logic [1:0] s_tx_shift_2;
   logic [3:0] s_tx_shift_4;
   // software nss ctrl is more flexible
-  assign s_nss_sel    = (nss_i & {4{busy_o & ass_i}}) | (nss_i & {4{~ass_i}});
-  assign spi_nss_o    = ~(s_nss_sel[`SPI_NSS_NUM-1:0] ^ csv_i[`SPI_NSS_NUM-1:0]);
+  assign s_nss_sel  = (nss_i & {4{busy_o & ass_i}}) | (nss_i & {4{~ass_i}});
+  assign spi_nss_o  = ~(s_nss_sel[`SPI_NSS_NUM-1:0] ^ csv_i[`SPI_NSS_NUM-1:0]);
 
-  assign busy_o       = '0;
-  assign last_o       = '0;
-  assign tx_ready_o   = '0;
-  assign rx_valid_o   = '0;
-  assign rx_data_o    = '0;
+  assign s_tx_trg   = (cpol_i ^ cpha_i ? s_pos_edge : s_neg_edge) && ~last_o;
+
+  assign busy_o     = '0;
+  assign last_o     = '0;
+  assign tx_ready_o = '0;
+  assign rx_valid_o = '0;
+  assign rx_data_o  = '0;
 
   spi_clkgen u_spi_clkgen (
       .clk_i     (clk_i),
@@ -343,24 +350,106 @@ module spi_core (
     endcase
   end
 
-  // dw: 8, 16, 24, 32 // 12
-  // shift 1 2 4
+  always_comb begin
+    s_tx_shift_1 = s_tx_multi_shift_1[0];
+    s_tx_shift_2 = s_tx_multi_shift_2[0];
+    s_tx_shift_4 = s_tx_multi_shift_4[0];
+    unique case (s_spi_fsm_q)
+      `SPI_FSM_IDLE: begin
+        s_tx_shift_1 = s_tx_multi_shift_1[0];
+        s_tx_shift_2 = s_tx_multi_shift_2[0];
+        s_tx_shift_4 = s_tx_multi_shift_4[0];
+      end
+      `SPI_FSM_CMD: begin
+        s_tx_shift_1 = s_tx_multi_shift_1[0];
+        s_tx_shift_2 = s_tx_multi_shift_2[0];
+        s_tx_shift_4 = s_tx_multi_shift_4[0];
+      end
+      `SPI_FSM_ADDR: begin
+        s_tx_shift_1 = s_tx_multi_shift_1[asize_i];
+        s_tx_shift_2 = s_tx_multi_shift_2[asize_i];
+        s_tx_shift_4 = s_tx_multi_shift_4[asize_i];
+      end
+      `SPI_FSM_ALTR: begin
+        s_tx_shift_1 = s_tx_multi_shift_1[alsize_i];
+        s_tx_shift_2 = s_tx_multi_shift_2[alsize_i];
+        s_tx_shift_4 = s_tx_multi_shift_4[alsize_i];
+      end
+      `SPI_FSM_NOP: begin
+        s_tx_shift_1 = '0;
+        s_tx_shift_2 = '0;
+        s_tx_shift_4 = '0;
+      end
+      `SPI_FSM_WDATA: begin
+        s_tx_shift_1 = s_tx_multi_shift_1[dsize_i];
+        s_tx_shift_2 = s_tx_multi_shift_2[dsize_i];
+        s_tx_shift_4 = s_tx_multi_shift_4[dsize_i];
+      end
+      `SPI_FSM_RDATA: begin
+        s_tx_shift_1 = s_tx_multi_shift_1[0];
+        s_tx_shift_2 = s_tx_multi_shift_2[0];
+        s_tx_shift_4 = s_tx_multi_shift_4[0];
+      end
+      default: begin
+        s_tx_shift_1 = s_tx_multi_shift_1[0];
+        s_tx_shift_2 = s_tx_multi_shift_2[0];
+        s_tx_shift_4 = s_tx_multi_shift_4[0];
+      end
+    endcase
+  end
 
-  // for()
-  // assign s_tx_shift_1 = 
-  // shift_reg #(
-  //     .DATA_WIDTH(8 * i),
-  //     .SHIFT_NUM (1)
-  // ) u_std_spi_tx_shift_reg (
-  //     .clk_i     (clk_i),
-  //     .rst_n_i   (rst_n_i),
-  //     .type_i    (`SHIFT_REG_TYPE_LOGIC),
-  //     .dir_i     ({1'b0, lsb_i}),
-  //     .ld_en_i   (tx_valid_i && tx_ready_o),
-  //     .sft_en_i  (s_tx_trg),
-  //     .ser_dat_i (1'b0),
-  //     .par_data_i(),
-  //     .ser_dat_o (),
-  //     .par_data_o()
-  // );
+  for (genvar i = 1; i <= 4; i++) begin : SPI_TX_SHIFT_1_BLOCK
+    shift_reg #(
+        .DATA_WIDTH(8 * i),
+        .SHIFT_NUM (1)
+    ) u_std_spi_tx_shift_reg (
+        .clk_i     (clk_i),
+        .rst_n_i   (rst_n_i),
+        .type_i    (`SHIFT_REG_TYPE_LOGIC),
+        .dir_i     ({1'b0, lsb_i}),
+        .ld_en_i   (),
+        .sft_en_i  (s_tx_trg),
+        .ser_dat_i ('0),
+        .par_data_i(),
+        .ser_dat_o (s_tx_multi_shift_1[i-1]),
+        .par_data_o()
+    );
+  end
+
+  for (genvar i = 1; i <= 4; i++) begin : SPI_TX_SHIFT_2_BLOCK
+    shift_reg #(
+        .DATA_WIDTH(8 * i),
+        .SHIFT_NUM (2)
+    ) u_std_spi_tx_shift_reg (
+        .clk_i     (clk_i),
+        .rst_n_i   (rst_n_i),
+        .type_i    (`SHIFT_REG_TYPE_LOGIC),
+        .dir_i     ({1'b0, lsb_i}),
+        .ld_en_i   (),
+        .sft_en_i  (s_tx_trg),
+        .ser_dat_i ('0),
+        .par_data_i(),
+        .ser_dat_o (s_tx_multi_shift_2[i-1]),
+        .par_data_o()
+    );
+  end
+
+  for (genvar i = 1; i <= 4; i++) begin : SPI_TX_SHIFT_4_BLOCK
+    shift_reg #(
+        .DATA_WIDTH(8 * i),
+        .SHIFT_NUM (4)
+    ) u_std_spi_tx_shift_reg (
+        .clk_i     (clk_i),
+        .rst_n_i   (rst_n_i),
+        .type_i    (`SHIFT_REG_TYPE_LOGIC),
+        .dir_i     ({1'b0, lsb_i}),
+        .ld_en_i   (),
+        .sft_en_i  (s_tx_trg),
+        .ser_dat_i ('0),
+        .par_data_i(),
+        .ser_dat_o (s_tx_multi_shift_4[i-1]),
+        .par_data_o()
+    );
+  end
+
 endmodule
