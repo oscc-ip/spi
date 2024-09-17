@@ -23,7 +23,7 @@ module apb4_spi #(
   logic [3:0] s_apb4_addr;
   logic s_apb4_wr_hdshk, s_apb4_rd_hdshk;
   logic [`SPI_CTRL_WIDTH-1:0] s_spi_ctrl_d, s_spi_ctrl_q;
-  logic s_spi_ctrl_en;
+  logic s_spi_ctrl_wr, s_spi_ctrl_en;
   logic [`SPI_FMT_WIDTH-1:0] s_spi_fmt_d, s_spi_fmt_q;
   logic s_spi_fmt_en;
   logic [`SPI_FRAME_WIDTH-1:0] s_spi_frame_d, s_spi_frame_q;
@@ -38,7 +38,6 @@ module apb4_spi #(
   logic s_spi_nop_en;
   logic [`SPI_TRL_WIDTH-1:0] s_spi_trl_d, s_spi_trl_q;
   logic s_spi_trl_en;
-
   logic [`SPI_STAT_WIDTH-1:0] s_spi_stat_d, s_spi_stat_q;
   // bit
   logic s_bit_en, s_bit_txie, s_bit_rxie, s_bit_st, s_bit_rwm;
@@ -60,52 +59,47 @@ module apb4_spi #(
   logic [LOG_FIFO_DEPTH:0] s_tx_elem, s_rx_elem;
   // spi
   logic s_last, s_pos_edge, s_neg_edge;
-  logic [3:0] s_nss_sel;
 
-  assign s_apb4_addr = apb4.paddr[5:2];
+  assign s_apb4_addr     = apb4.paddr[5:2];
   assign s_apb4_wr_hdshk = apb4.psel && apb4.penable && apb4.pwrite;
   assign s_apb4_rd_hdshk = apb4.psel && apb4.penable && (~apb4.pwrite);
-  assign apb4.pready = 1'b1;
-  assign apb4.pslverr = 1'b0;
+  assign apb4.pready     = 1'b1;
+  assign apb4.pslverr    = 1'b0;
 
-  assign s_bit_en = s_spi_ctrl_q[0];
-  assign s_bit_txie = s_spi_ctrl_q[1];
-  assign s_bit_rxie = s_spi_ctrl_q[2];
-  assign s_bit_st = s_spi_ctrl_q[3];
-  assign s_bit_rwm = s_spi_ctrl_q[4];
-  assign s_bit_nss = s_spi_ctrl_q[8:5];
+  assign s_bit_en        = s_spi_ctrl_q[0];
+  assign s_bit_txie      = s_spi_ctrl_q[1];
+  assign s_bit_rxie      = s_spi_ctrl_q[2];
+  assign s_bit_st        = s_spi_ctrl_q[3];
+  assign s_bit_rwm       = s_spi_ctrl_q[4];
+  assign s_bit_nss       = s_spi_ctrl_q[8:5];
 
-  assign s_bit_cpha = s_spi_fmt_q[0];
-  assign s_bit_cpol = s_spi_fmt_q[1];
-  assign s_bit_lsb = s_spi_fmt_q[2];
-  assign s_bit_rdm = s_spi_fmt_q[3];
-  assign s_bit_ass = s_spi_fmt_q[4];
-  assign s_bit_csv = s_spi_fmt_q[8:5];
-  assign s_bit_div = s_spi_fmt_q[16:9];
-  assign s_bit_txth = s_spi_fmt_q[21:17];
-  assign s_bit_rxth = s_spi_fmt_q[26:22];
+  assign s_bit_cpha      = s_spi_fmt_q[0];
+  assign s_bit_cpol      = s_spi_fmt_q[1];
+  assign s_bit_lsb       = s_spi_fmt_q[2];
+  assign s_bit_rdm       = s_spi_fmt_q[3];
+  assign s_bit_ass       = s_spi_fmt_q[4];
+  assign s_bit_csv       = s_spi_fmt_q[8:5];
+  assign s_bit_div       = s_spi_fmt_q[16:9];
+  assign s_bit_txth      = s_spi_fmt_q[21:17];
+  assign s_bit_rxth      = s_spi_fmt_q[26:22];
 
-  assign s_bit_cmode = s_spi_frame_q[1:0];
-  assign s_bit_amode = s_spi_frame_q[3:2];
-  assign s_bit_asize = s_spi_frame_q[5:4];
-  assign s_bit_almode = s_spi_frame_q[7:6];
-  assign s_bit_alsize = s_spi_frame_q[9:8];
-  assign s_bit_dmode = s_spi_frame_q[11:10];
-  assign s_bit_dsize = s_spi_frame_q[13:12];
+  assign s_bit_cmode     = s_spi_frame_q[1:0];
+  assign s_bit_amode     = s_spi_frame_q[3:2];
+  assign s_bit_asize     = s_spi_frame_q[5:4];
+  assign s_bit_almode    = s_spi_frame_q[7:6];
+  assign s_bit_alsize    = s_spi_frame_q[9:8];
+  assign s_bit_dmode     = s_spi_frame_q[11:10];
+  assign s_bit_dsize     = s_spi_frame_q[13:12];
 
-  assign s_bit_txif = s_spi_stat_q[0];
-  assign s_bit_rxif = s_spi_stat_q[1];
+  assign s_bit_txif      = s_spi_stat_q[0];
+  assign s_bit_rxif      = s_spi_stat_q[1];
+  // irq
+  assign s_tx_irq_trg    = s_bit_txth > s_tx_elem;
+  assign s_rx_irq_trg    = s_bit_rxth < s_rx_elem;
+  assign spi.irq_o       = s_bit_txif | s_bit_rxif;
 
-  assign s_busy = 1'b0;  // HACK:
-  assign s_last = 1'b0;
-  // software nss ctrl is more flexible
-  assign s_nss_sel = (s_bit_nss & {4{s_busy & s_bit_ass}}) | (s_bit_nss & {4{~s_bit_ass}});
-  assign spi.spi_nss_o = ~(s_nss_sel[`SPI_NSS_NUM-1:0] ^ s_bit_csv[`SPI_NSS_NUM-1:0]);
-  assign s_tx_irq_trg = s_bit_txth > s_tx_elem;
-  assign s_rx_irq_trg = s_bit_rxth < s_rx_elem;
-  assign spi.irq_o = s_bit_txif | s_bit_rxif;
-
-  assign s_spi_ctrl_en   = (s_apb4_wr_hdshk && s_apb4_addr == `SPI_CTRL && ~s_busy) || (s_busy && s_last);
+  assign s_spi_ctrl_wr   = s_apb4_wr_hdshk && s_apb4_addr == `SPI_CTRL && ~s_busy;
+  assign s_spi_ctrl_en   = s_spi_ctrl_wr || (s_busy && s_last);
   always_comb begin
     s_spi_ctrl_d = s_spi_ctrl_q;
     if (s_apb4_wr_hdshk && s_apb4_addr == `SPI_CTRL && ~s_busy) begin
@@ -256,70 +250,67 @@ module apb4_spi #(
     end
   end
 
-  // assign s_tx_push_ready = ~s_tx_full;
-  // assign s_tx_pop_valid  = ~s_tx_empty;
-  // fifo #(
-  //     .DATA_WIDTH  (32),
-  //     .BUFFER_DEPTH(FIFO_DEPTH)
-  // ) u_tx_fifo (
-  //     .clk_i  (apb4.pclk),
-  //     .rst_n_i(apb4.presetn),
-  //     .flush_i(~s_bit_en),
-  //     .cnt_o  (s_tx_elem),
-  //     .push_i (s_tx_push_valid),
-  //     .full_o (s_tx_full),
-  //     .dat_i  (s_tx_push_data),
-  //     .pop_i  (s_tx_pop_ready),
-  //     .empty_o(s_tx_empty),
-  //     .dat_o  (s_tx_pop_data)
-  // );
+  assign s_tx_push_ready = ~s_tx_full;
+  assign s_tx_pop_valid  = ~s_tx_empty;
+  fifo #(
+      .DATA_WIDTH  (32),
+      .BUFFER_DEPTH(FIFO_DEPTH)
+  ) u_tx_fifo (
+      .clk_i  (apb4.pclk),
+      .rst_n_i(apb4.presetn),
+      .flush_i(~s_bit_en),
+      .cnt_o  (s_tx_elem),
+      .push_i (s_tx_push_valid),
+      .full_o (s_tx_full),
+      .dat_i  (s_tx_push_data),
+      .pop_i  (s_tx_pop_ready),
+      .empty_o(s_tx_empty),
+      .dat_o  (s_tx_pop_data)
+  );
 
-  // assign s_rx_push_ready = ~s_rx_full;
-  // assign s_rx_pop_valid  = ~s_rx_empty;
-  // fifo #(
-  //     .DATA_WIDTH  (32),
-  //     .BUFFER_DEPTH(FIFO_DEPTH)
-  // ) u_rx_fifo (
-  //     .clk_i  (apb4.pclk),
-  //     .rst_n_i(apb4.presetn),
-  //     .flush_i(~s_bit_en),
-  //     .cnt_o  (s_rx_elem),
-  //     .push_i (s_rx_push_valid),
-  //     .full_o (s_rx_full),
-  //     .dat_i  (s_rx_push_data),
-  //     .pop_i  (s_rx_pop_ready),
-  //     .empty_o(s_rx_empty),
-  //     .dat_o  (s_rx_pop_data)
-  // );
+  assign s_rx_push_ready = ~s_rx_full;
+  assign s_rx_pop_valid  = ~s_rx_empty;
+  fifo #(
+      .DATA_WIDTH  (32),
+      .BUFFER_DEPTH(FIFO_DEPTH)
+  ) u_rx_fifo (
+      .clk_i  (apb4.pclk),
+      .rst_n_i(apb4.presetn),
+      .flush_i(~s_bit_en),
+      .cnt_o  (s_rx_elem),
+      .push_i (s_rx_push_valid),
+      .full_o (s_rx_full),
+      .dat_i  (s_rx_push_data),
+      .pop_i  (s_rx_pop_ready),
+      .empty_o(s_rx_empty),
+      .dat_o  (s_rx_pop_data)
+  );
 
-  // spi_core u_spi_core (
-  //     .clk_i       (apb4.pclk),
-  //     .rst_n_i     (apb4.presetn),
-  //     .lsb_i       (s_bit_lsb),
-  //     .st_i        (s_bit_st),
-  //     .rwm_i       (s_bit_rwm),
-  //     .pos_edge_i  (s_pos_edge),
-  //     .neg_edge_i  (s_neg_edge),
-  //     .cpol_i      (s_bit_cpol),
-  //     .cpha_i      (s_bit_cpha),
-  //     .tdtb_i      (s_bit_tdtb),
-  //     .rdtb_i      (s_bit_rdtb),
-  //     .spm_i       (s_bit_spm),
-  //     .snm_i       (s_bit_snm),
-  //     .cal_i       (s_spi_cal_q),
-  //     .trl_valid_i (s_apb4_wr_hdshk && s_apb4_addr == `SPI_TRL),
-  //     .trl_i       (apb4.pwdata[`SPI_TRL_WIDTH-1:0]),
-  //     .busy_o      (s_busy),
-  //     .last_o      (s_last),
-  //     .tx_valid_i  (s_tx_pop_valid),
-  //     .tx_ready_o  (s_tx_pop_ready),
-  //     .tx_data_i   (s_tx_pop_data),
-  //     .rx_valid_o  (s_rx_push_valid),
-  //     .rx_ready_i  (s_rx_push_ready),
-  //     .rx_data_o   (s_rx_push_data),
-  //     .spi_io_en_o (spi.spi_io_en_o),
-  //     .spi_io_in_i (spi.spi_io_in_i),
-  //     .spi_io_out_o(spi.spi_io_out_o)
-  // );
+  spi_core u_spi_core (
+      .clk_i       (apb4.pclk),
+      .rst_n_i     (apb4.presetn),
+      .nss_i       (s_bit_nss),
+      .csv_i       (s_bit_csv),
+      .ass_i       (s_bit_ass),
+      .lsb_i       (s_bit_lsb),
+      .st_i        (s_bit_st),
+      .rwm_i       (s_bit_rwm),
+      .cpol_i      (s_bit_cpol),
+      .cpha_i      (s_bit_cpha),
+      .trl_i       (s_spi_trl_q),
+      .busy_o      (s_busy),
+      .last_o      (s_last),
+      .tx_valid_i  (s_tx_pop_valid),
+      .tx_ready_o  (s_tx_pop_ready),
+      .tx_data_i   (s_tx_pop_data),
+      .rx_valid_o  (s_rx_push_valid),
+      .rx_ready_i  (s_rx_push_ready),
+      .rx_data_o   (s_rx_push_data),
+      .spi_sck_o   (spi.spi_sck_o),
+      .spi_nss_o   (spi.spi_nss_o),
+      .spi_io_en_o (spi.spi_io_en_o),
+      .spi_io_in_i (spi.spi_io_in_i),
+      .spi_io_out_o(spi.spi_io_out_o)
+  );
 
 endmodule

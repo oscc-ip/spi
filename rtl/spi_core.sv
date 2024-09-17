@@ -13,33 +13,43 @@
 `include "spi_define.sv"
 
 module spi_core (
-    input  logic                       clk_i,
-    input  logic                       rst_n_i,
-    input  logic                       lsb_i,
-    input  logic                       st_i,
-    input  logic                       rwm_i,
-    input  logic                       pos_edge_i,
-    input  logic                       neg_edge_i,
-    input  logic                       cpol_i,
-    input  logic                       cpha_i,
-    input  logic                       tdtb_i,
-    input  logic                       rdtb_i,
-    input  logic [                1:0] spm_i,
-    input  logic [                3:0] snm_i,
-    input  logic [ `SPI_CAL_WIDTH-1:0] cal_i,
-    input  logic                       trl_valid_i,
-    input  logic [ `SPI_TRL_WIDTH-1:0] trl_i,
-    output logic                       busy_o,
-    output logic                       last_o,
-    input  logic                       tx_valid_i,
-    output logic                       tx_ready_o,
-    input  logic [`SPI_DATA_WIDTH-1:0] tx_data_i,
-    output logic                       rx_valid_o,
-    input  logic                       rx_ready_i,
-    output logic [`SPI_DATA_WIDTH-1:0] rx_data_o,
-    output logic [                3:0] spi_io_en_o,
-    input  logic [                3:0] spi_io_in_i,
-    output logic [                3:0] spi_io_out_o
+    input  logic                      clk_i,
+    input  logic                      rst_n_i,
+    input  logic [               3:0] nss_i,
+    input  logic [               3:0] csv_i,
+    input  logic                      ass_i,
+    input  logic                      lsb_i,
+    input  logic                      st_i,
+    input  logic                      rwm_i,
+    input  logic                      cpol_i,
+    input  logic                      cpha_i,
+    input  logic [`SPI_TRL_WIDTH-1:0] trl_i,
+    output logic                      busy_o,
+    output logic                      last_o,
+    input  logic                      tx_valid_i,
+    output logic                      tx_ready_o,
+    input  logic [              31:0] tx_data_i,
+    output logic                      rx_valid_o,
+    input  logic                      rx_ready_i,
+    output logic [              31:0] rx_data_o,
+    output logic                      spi_sck_o,
+    output logic [  `SPI_NSS_NUM-1:0] spi_nss_o,
+    output logic [               3:0] spi_io_en_o,
+    input  logic [               3:0] spi_io_in_i,
+    output logic [               3:0] spi_io_out_o
 );
+  logic [3:0] s_nss_sel;
+  // software nss ctrl is more flexible
+  assign s_nss_sel    = (nss_i & {4{busy_o & ass_i}}) | (nss_i & {4{~ass_i}});
+  assign spi_nss_o    = ~(s_nss_sel[`SPI_NSS_NUM-1:0] ^ csv_i[`SPI_NSS_NUM-1:0]);
+
+  assign busy_o       = '0;
+  assign last_o       = '0;
+  assign tx_ready_o   = '0;
+  assign rx_valid_o   = '0;
+  assign rx_data_o    = '0;
+  assign spi_sck_o    = '0;
+  assign spi_io_en_o  = '0;
+  assign spi_io_out_o = '0;
 
 endmodule

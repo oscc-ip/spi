@@ -165,16 +165,21 @@ task automatic SPITest::test_reset_reg();
   // verilog_format: on
 endtask
 
-// task automatic SPITest::test_wr_rd_reg(input bit [31:0] run_times = 1000);
-//   super.test_wr_rd_reg();
-//   // verilog_format: off
-//   for (int i = 0; i < run_times; i++) begin
-//       this.wr_rd_check(`SPI_CTRL1_ADDR, "CTRL1 REG", $random & {`SPI_CTRL1_WIDTH{1'b1}}, Helper::EQUL);
-//       this.wr_rd_check(`SPI_DIV_ADDR, "DIV REG", $random & {`SPI_DIV_WIDTH{1'b1}}, Helper::EQUL);
-//       this.wr_rd_check(`SPI_CAL_ADDR, "CAL REG", $random & {`SPI_CAL_WIDTH{1'b1}}, Helper::EQUL);
-//   end
-//   // verilog_format: on
-// endtask
+task automatic SPITest::test_wr_rd_reg(input bit [31:0] run_times = 1000);
+  super.test_wr_rd_reg();
+  // verilog_format: off
+  for (int i = 0; i < run_times; i++) begin
+    this.wr_rd_check(`SPI_CTRL_ADDR, "CTRL REG", $random & {`SPI_CTRL_WIDTH{1'b1}}, Helper::EQUL);
+    this.wr_rd_check(`SPI_FMT_ADDR, "FMT REG", $random & {`SPI_FMT_WIDTH{1'b1}}, Helper::EQUL);
+    this.wr_rd_check(`SPI_FRAME_ADDR, "FRAME REG", $random & {`SPI_FRAME_WIDTH{1'b1}}, Helper::EQUL);
+    this.wr_rd_check(`SPI_CMD_ADDR, "CMD REG", $random & {`SPI_CMD_WIDTH{1'b1}}, Helper::EQUL);
+    this.wr_rd_check(`SPI_ADDR_ADDR, "ADDR REG", $random & {`SPI_ADDR_WIDTH{1'b1}}, Helper::EQUL);
+    this.wr_rd_check(`SPI_ALTR_ADDR, "ALTR REG", $random & {`SPI_ALTR_WIDTH{1'b1}}, Helper::EQUL);
+    this.wr_rd_check(`SPI_NOP_ADDR, "NOP REG", $random & {`SPI_NOP_WIDTH{1'b1}}, Helper::EQUL);
+    this.wr_rd_check(`SPI_TRL_ADDR, "TRL REG", $random & {`SPI_TRL_WIDTH{1'b1}}, Helper::EQUL);
+  end
+  // verilog_format: on
+endtask
 
 // task automatic SPITest::manu_send_data();
 //   $display("[%t]=== [manu send data] ===", $time);
