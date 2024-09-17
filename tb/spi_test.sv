@@ -33,6 +33,7 @@ class SPITest extends APB4Master;
   extern task automatic spi_flash_sector_erase(bit [31:0] sect_addr);
   extern task automatic test_reset_reg();
   extern task automatic test_wr_rd_reg(input bit [31:0] run_times = 1000);
+  extern task automatic test_div_clk();
   extern task automatic manu_send_data();
   extern task automatic single_8_data_wr_test();
   extern task automatic w25q_std_spi_wr_rd_test();
@@ -179,6 +180,13 @@ task automatic SPITest::test_wr_rd_reg(input bit [31:0] run_times = 1000);
     this.wr_rd_check(`SPI_TRL_ADDR, "TRL REG", $random & {`SPI_TRL_WIDTH{1'b1}}, Helper::EQUL);
   end
   // verilog_format: on
+endtask
+
+task automatic SPITest::test_div_clk();
+  repeat (200 * 3) @(posedge this.apb4.pclk);
+  $display("[%t]=== [test div clk] ===", $time);
+
+  this.write(`SPI_FMT_ADDR, 32'b0);
 endtask
 
 // task automatic SPITest::manu_send_data();

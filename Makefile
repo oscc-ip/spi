@@ -14,7 +14,7 @@ SIM_OPTIONS  := -full64 -debug_acc+all  +v2k -sverilog -timescale=1ns/10ps \
                 -kdb \
 
 SRC_FILE ?=
-# SRC_FILE += ../rtl/spi_clkgen.sv
+SRC_FILE += ../rtl/spi_clkgen.sv
 SRC_FILE += ../rtl/spi_core.sv
 SRC_FILE += ../rtl/apb4_spi.sv
 SRC_FILE += ../tb/spi_test.sv

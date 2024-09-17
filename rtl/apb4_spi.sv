@@ -297,6 +297,7 @@ module apb4_spi #(
       .rwm_i       (s_bit_rwm),
       .cpol_i      (s_bit_cpol),
       .cpha_i      (s_bit_cpha),
+      .div_i       (s_bit_div),
       .trl_i       (s_spi_trl_q),
       .busy_o      (s_busy),
       .last_o      (s_last),

@@ -23,6 +23,7 @@ module spi_core (
     input  logic                      rwm_i,
     input  logic                      cpol_i,
     input  logic                      cpha_i,
+    input  logic [               7:0] div_i,
     input  logic [`SPI_TRL_WIDTH-1:0] trl_i,
     output logic                      busy_o,
     output logic                      last_o,
@@ -52,4 +53,16 @@ module spi_core (
   assign spi_io_en_o  = '0;
   assign spi_io_out_o = '0;
 
+  spi_clkgen u_spi_clkgen (
+      .clk_i     (clk_i),
+      .rst_n_i   (rst_n_i),
+      .busy_i    (1'b1),
+      .st_i      (1'b1),
+      .cpol_i    (1'b0),
+      .div_i     (8'd1),
+      .last_i    (1'b0),
+      .clk_o     (),
+      .pos_edge_o(),
+      .neg_edge_o()
+  );
 endmodule
