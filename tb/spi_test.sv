@@ -186,7 +186,7 @@ task automatic SPITest::single_8_data_wr_test();
 endtask
 
 task automatic SPITest::w25q_std_spi_wr_rd_test();
-  $display("=== [test std spi wr rd] ===");
+  $display("%t === [test std spi wr rd] ===", $time);
   this.wr_que = {};
   this.wr_num = 32;
 

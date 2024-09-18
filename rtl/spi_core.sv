@@ -70,29 +70,34 @@ module spi_core (
 
   // spi mode ctrl
   always_comb begin
-    spi_io_en_o = '1;
+    spi_io_en_o = '0;
     unique case (spm_i)
       `SPI_STD_SPI: begin
-        spi_io_en_o[0] = 1'b0;
-        spi_io_en_o[1] = 1'b1;
+        spi_io_en_o[0] = 1'b1;
+        spi_io_en_o[1] = 1'b0;
+        spi_io_en_o[2] = 1'b1;
+        spi_io_en_o[3] = 1'b1;
       end
       `SPI_DUAL_SPI: begin
         if (~rwm_i) begin
-          spi_io_en_o[1:0] = '0;  // wr only oper
+          spi_io_en_o[1:0] = '1;  // wr only oper
         end else begin  // when par addr mode, set io high-z state
-          spi_io_en_o[0] = s_trl_q <= cal_i ? 1'b1 : 1'b0;
-          spi_io_en_o[1] = snm_i > 4'b1 ? 1'b1 : (s_trl_q <= cal_i ? 1'b1 : 1'b0);
+          spi_io_en_o[0] = s_trl_q <= cal_i ? 1'b0 : 1'b1;
+          spi_io_en_o[1] = snm_i > 4'b1 ? 1'b0 : (s_trl_q <= cal_i ? 1'b0 : 1'b1);
         end
+
+        spi_io_en_o[2] = 1'b1;
+        spi_io_en_o[3] = 1'b1;
       end
       `SPI_QUAD_SPI: begin
         if (~rwm_i) begin
-          spi_io_en_o[3:0] = '0;  // wr only oper
+          spi_io_en_o[3:0] = '1;  // wr only oper
         end else begin
-          spi_io_en_o[0]   = s_trl_q <= cal_i ? 1'b1 : 1'b0;
-          spi_io_en_o[3:1] = snm_i > 4'b1 ? '1 : (s_trl_q <= cal_i ? '1 : '0);
+          spi_io_en_o[0]   = s_trl_q <= cal_i ? 1'b0 : 1'b1;
+          spi_io_en_o[3:1] = snm_i > 4'b1 ? '0 : (s_trl_q <= cal_i ? '0 : '1);
         end
       end
-      default: spi_io_en_o = '1;
+      default: spi_io_en_o = '0;
     endcase
   end
 
@@ -100,10 +105,17 @@ module spi_core (
   always_comb begin
     spi_io_out_o[3:0] = '0;
     unique case (spm_i)
-      `SPI_STD_SPI: spi_io_out_o[0] = s_std_mosi[tdtb_i];
+      `SPI_STD_SPI: begin
+        spi_io_out_o[0] = s_std_mosi[tdtb_i];
+        spi_io_out_o[1] = 1'b0;
+        spi_io_out_o[2] = 1'b1;
+        spi_io_out_o[3] = 1'b1;
+      end
       `SPI_DUAL_SPI: begin
         spi_io_out_o[0] = s_par_trg ? s_dual_io[tdtb_i][0] : s_std_mosi[0];  // 8b cmd trans
         spi_io_out_o[1] = s_par_trg ? s_dual_io[tdtb_i][1] : '0;
+        spi_io_out_o[2] = 1'b1;
+        spi_io_out_o[3] = 1'b1;
       end
       `SPI_QUAD_SPI: begin
         spi_io_out_o[0] = s_par_trg ? s_quad_io[tdtb_i][0] : s_std_mosi[0];  // 8b cmd trans
@@ -111,7 +123,7 @@ module spi_core (
         spi_io_out_o[2] = s_par_trg ? s_quad_io[tdtb_i][2] : '0;
         spi_io_out_o[3] = s_par_trg ? s_quad_io[tdtb_i][3] : '0;
       end
-      default:      spi_io_out_o[3:0] = '0;
+      default: spi_io_out_o[3:0] = '0;
     endcase
   end
 

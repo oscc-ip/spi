@@ -44,7 +44,7 @@ module apb4_spi_tb ();
   for (genvar i = 0; i < 4; i++) begin : SPI_TB_PAD_BLOCK
     tri_pd_pad_h u_spi_io_pad (
         .i_i   (u_spi_if.spi_io_out_o[i]),
-        .oen_i (~u_spi_if.spi_io_en_o[i]),
+        .oen_i (u_spi_if.spi_io_en_o[i]),
         .ren_i (),
         .c_o   (u_spi_if.spi_io_in_i[i]),
         .pad_io(s_spi_io_pad[i])
