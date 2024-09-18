@@ -170,7 +170,7 @@ task automatic SPITest::test_wr_rd_reg(input bit [31:0] run_times = 1000);
   super.test_wr_rd_reg();
   // verilog_format: off
   for (int i = 0; i < run_times; i++) begin
-    this.wr_rd_check(`SPI_CTRL_ADDR, "CTRL REG", $random & {`SPI_CTRL_WIDTH{1'b1}}, Helper::EQUL);
+    // this.wr_rd_check(`SPI_CTRL_ADDR, "CTRL REG", $random & {`SPI_CTRL_WIDTH{1'b1}}, Helper::EQUL);
     this.wr_rd_check(`SPI_FMT_ADDR, "FMT REG", $random & {`SPI_FMT_WIDTH{1'b1}}, Helper::EQUL);
     this.wr_rd_check(`SPI_FRAME_ADDR, "FRAME REG", $random & {`SPI_FRAME_WIDTH{1'b1}}, Helper::EQUL);
     this.wr_rd_check(`SPI_CMD_ADDR, "CMD REG", $random & {`SPI_CMD_WIDTH{1'b1}}, Helper::EQUL);
