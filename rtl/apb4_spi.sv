@@ -33,7 +33,7 @@ module apb4_spi #(
   logic [`SPI_STAT_WIDTH-1:0] s_spi_stat_d, s_spi_stat_q;
   // bit
   logic s_bit_cpha, s_bit_cpol, s_bit_lsb, s_bit_ass, s_bit_rdm, s_bit_sstr;
-  logic [1:0] s_bit_tdtb, s_bit_rdtb, s_bit_spm;
+  logic [1:0] s_bit_tdtb, s_bit_rdtb, s_bit_spm, s_bit_const;
   logic [4:0] s_bit_txth, s_bit_rxth;
   logic s_bit_txie, s_bit_rxie, s_bit_en, s_bit_st, s_bit_rwm;
   logic [3:0] s_bit_snm, s_bit_nss, s_bit_csv;
@@ -76,6 +76,7 @@ module apb4_spi #(
   assign s_bit_nss       = s_spi_ctrl2_q[8:5];
   assign s_bit_csv       = s_spi_ctrl2_q[12:9];
   assign s_bit_snm       = s_spi_ctrl2_q[16:13];
+  assign s_bit_const     = s_spi_ctrl2_q[18:17];
 
   assign s_bit_txif      = s_spi_stat_q[0];
   assign s_bit_rxif      = s_spi_stat_q[1];
@@ -256,6 +257,7 @@ module apb4_spi #(
       .rdtb_i      (s_bit_rdtb),
       .spm_i       (s_bit_spm),
       .snm_i       (s_bit_snm),
+      .const_i(s_bit_const),
       .cal_i       (s_spi_cal_q),
       .trl_valid_i (s_apb4_wr_hdshk && s_apb4_addr == `SPI_TRL),
       .trl_i       (apb4.pwdata[`SPI_TRL_WIDTH-1:0]),

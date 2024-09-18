@@ -26,6 +26,7 @@ module spi_core (
     input  logic [                1:0] rdtb_i,
     input  logic [                1:0] spm_i,
     input  logic [                3:0] snm_i,
+    input  logic [                1:0] const_i,
     input  logic [ `SPI_CAL_WIDTH-1:0] cal_i,
     input  logic                       trl_valid_i,
     input  logic [ `SPI_TRL_WIDTH-1:0] trl_i,
@@ -106,16 +107,14 @@ module spi_core (
     spi_io_out_o[3:0] = '0;
     unique case (spm_i)
       `SPI_STD_SPI: begin
-        spi_io_out_o[0] = s_std_mosi[tdtb_i];
-        spi_io_out_o[1] = 1'b0;
-        spi_io_out_o[2] = 1'b1;
-        spi_io_out_o[3] = 1'b1;
+        spi_io_out_o[0]   = s_std_mosi[tdtb_i];
+        spi_io_out_o[1]   = 1'b0;
+        spi_io_out_o[3:2] = ~const_i;
       end
       `SPI_DUAL_SPI: begin
-        spi_io_out_o[0] = s_par_trg ? s_dual_io[tdtb_i][0] : s_std_mosi[0];  // 8b cmd trans
-        spi_io_out_o[1] = s_par_trg ? s_dual_io[tdtb_i][1] : '0;
-        spi_io_out_o[2] = 1'b1;
-        spi_io_out_o[3] = 1'b1;
+        spi_io_out_o[0]   = s_par_trg ? s_dual_io[tdtb_i][0] : s_std_mosi[0];  // 8b cmd trans
+        spi_io_out_o[1]   = s_par_trg ? s_dual_io[tdtb_i][1] : '0;
+        spi_io_out_o[3:2] = ~const_i;
       end
       `SPI_QUAD_SPI: begin
         spi_io_out_o[0] = s_par_trg ? s_quad_io[tdtb_i][0] : s_std_mosi[0];  // 8b cmd trans
