@@ -12,9 +12,12 @@
 `include "edge_det.sv"
 `include "spi_define.sv"
 
-module spi_core (
+module spi_core #(
+    parameter int FIFO_DEPTH = 64
+) (
     input  logic                      clk_i,
     input  logic                      rst_n_i,
+    input  logic                      en_i,
     input  logic [               3:0] nss_i,
     input  logic [               3:0] csv_i,
     input  logic                      ass_i,
@@ -50,37 +53,84 @@ module spi_core (
     input  logic [               3:0] spi_io_in_i,
     output logic [               3:0] spi_io_out_o
 );
-  logic s_pos_edge, s_neg_edge, s_tx_trg;
+
+  logic s_pos_edge, s_neg_edge, s_clk_trg, s_tx_trg;
+  logic s_trans_done, s_dely_done;
+
+  logic [3:0] s_nss_sel;
+  logic [7:0] s_tx_data;
 
   logic [2:0] s_spi_fsm_d, s_spi_fsm_q;
-  logic [3:0] s_nss_sel;
+  logic [2:0] s_sg_cnt_d, s_sg_cnt_q;
+  logic [15:0] s_dat_cnt_d, s_dat_cnt_q;
+  logic [15:0] s_dely_cnt_d, s_dely_cnt_q;
 
-  logic       s_tx_multi_shift_1[0:3];
-  logic [1:0] s_tx_multi_shift_2[0:3];
-  logic [3:0] s_tx_multi_shift_4[0:3];
-  logic       s_tx_shift_1;
-  logic [1:0] s_tx_shift_2;
-  logic [3:0] s_tx_shift_4;
-  // software nss ctrl is more flexible
-  assign s_nss_sel  = (nss_i & {4{busy_o & ass_i}}) | (nss_i & {4{~ass_i}});
-  assign spi_nss_o  = ~(s_nss_sel[`SPI_NSS_NUM-1:0] ^ csv_i[`SPI_NSS_NUM-1:0]);
+  logic s_tx_shift_1_ld, s_tx_shift_2_ld, s_tx_shift_4_ld;
+  logic       s_tx_shift_1_dat;
+  logic [1:0] s_tx_shift_2_dat;
+  logic [3:0] s_tx_shift_4_dat;
 
-  assign s_tx_trg   = (cpol_i ^ cpha_i ? s_pos_edge : s_neg_edge) && ~last_o;
 
-  assign busy_o     = '0;
   assign last_o     = '0;
   assign tx_ready_o = '0;
   assign rx_valid_o = '0;
   assign rx_data_o  = '0;
 
+  // software nss ctrl is more flexible
+  assign s_nss_sel  = (nss_i & {4{busy_o & ass_i}}) | (nss_i & {4{~ass_i}});
+  assign spi_nss_o  = ~(s_nss_sel[`SPI_NSS_NUM-1:0] ^ csv_i[`SPI_NSS_NUM-1:0]);
+
+  assign s_tx_trg   = (cpol_i ^ cpha_i ? s_pos_edge : s_neg_edge) && ~last_o;
+  // s_rx_trg
+  assign busy_o     = ~s_trans_done;
+
+  always_comb begin
+    if (s_spi_fsm_q == `SPI_FSM_WDATA || s_spi_fsm_q == `SPI_FSM_RDATA) begin
+      s_trans_done = (~(|s_dat_cnt_q)) && (~(|s_sg_cnt_q));
+    end else begin
+      s_trans_done = ~(|s_sg_cnt_q);
+    end
+  end
+
+  assign s_dely_done = s_dely_cnt_q == nop_i - 1;
+  always_comb begin
+    s_dely_cnt_d = '0;
+    if (s_spi_fsm_q == `SPI_FSM_NOP) begin
+      if (s_dely_cnt_q == nop_i - 1) s_dely_cnt_d = '0;
+      else s_dely_cnt_d = s_dely_cnt_q + 1'b1;
+    end
+  end
+  dffr #(16) u_dely_cnt_dffr (
+      clk_i,
+      rst_n_i,
+      s_dely_cnt_d,
+      s_dely_cnt_q
+  );
+
+
+  always_comb begin
+    s_dat_cnt_d = '0;
+    if (s_spi_fsm_q == `SPI_FSM_WDATA) begin
+      if (s_dat_cnt_q == trl_i - 1) s_dat_cnt_d = '0;
+      else s_dat_cnt_d = s_dat_cnt_q + 1'b1;
+    end
+  end
+  dffr #(16) u_dat_cnt_dffr (
+      clk_i,
+      rst_n_i,
+      s_dat_cnt_d,
+      s_dat_cnt_q
+  );
+
   spi_clkgen u_spi_clkgen (
       .clk_i     (clk_i),
       .rst_n_i   (rst_n_i),
-      .busy_i    (1'b1),
-      .st_i      (1'b1),
-      .cpol_i    (1'b0),
-      .div_i     (8'd1),
-      .last_i    (1'b0),
+      .busy_i    (busy_o),
+      .st_i      (st_i),
+      .cpol_i    (cpol_i),
+      .div_i     (div_i),
+      .last_i    (last_o),
+      .clk_trg_o (s_clk_trg),
       .clk_o     (spi_sck_o),
       .pos_edge_o(s_pos_edge),
       .neg_edge_o(s_neg_edge)
@@ -91,18 +141,60 @@ module spi_core (
     s_spi_fsm_d = s_spi_fsm_q;
     unique case (s_spi_fsm_q)
       `SPI_FSM_IDLE: begin
+        if (st_i) begin
+          if (cmode_i != '0) s_spi_fsm_d = `SPI_FSM_CMD;
+          else if (amode_i != '0) s_spi_fsm_d = `SPI_FSM_ADDR;
+          else if (almode_i != '0) s_spi_fsm_d = `SPI_FSM_ALTR;
+          else if (nop_i != '0) s_spi_fsm_d = `SPI_FSM_NOP;
+          else if (dmode_i != '0) begin
+            if (rwm_i) s_spi_fsm_d = `SPI_FSM_RDATA;
+            else s_spi_fsm_d = `SPI_FSM_WDATA;
+          end else s_spi_fsm_d = `SPI_FSM_IDLE;
+        end
       end
       `SPI_FSM_CMD: begin
+        if (s_trans_done) begin
+          if (amode_i != '0) s_spi_fsm_d = `SPI_FSM_ADDR;
+          else if (almode_i != '0) s_spi_fsm_d = `SPI_FSM_ALTR;
+          else if (nop_i != '0) s_spi_fsm_d = `SPI_FSM_NOP;
+          else if (dmode_i != '0) begin
+            if (rwm_i) s_spi_fsm_d = `SPI_FSM_RDATA;
+            else s_spi_fsm_d = `SPI_FSM_WDATA;
+          end else s_spi_fsm_d = `SPI_FSM_IDLE;
+        end
       end
       `SPI_FSM_ADDR: begin
+        if (s_trans_done) begin
+          if (almode_i != '0) s_spi_fsm_d = `SPI_FSM_ALTR;
+          else if (nop_i != '0) s_spi_fsm_d = `SPI_FSM_NOP;
+          else if (dmode_i != '0) begin
+            if (rwm_i) s_spi_fsm_d = `SPI_FSM_RDATA;
+            else s_spi_fsm_d = `SPI_FSM_WDATA;
+          end else s_spi_fsm_d = `SPI_FSM_IDLE;
+        end
       end
       `SPI_FSM_ALTR: begin
+        if (s_trans_done) begin
+          if (nop_i != '0) s_spi_fsm_d = `SPI_FSM_NOP;
+          else if (dmode_i != '0) begin
+            if (rwm_i) s_spi_fsm_d = `SPI_FSM_RDATA;
+            else s_spi_fsm_d = `SPI_FSM_WDATA;
+          end else s_spi_fsm_d = `SPI_FSM_IDLE;
+        end
       end
       `SPI_FSM_NOP: begin
+        if (s_dely_done) begin
+          if (dmode_i != '0) begin
+            if (rwm_i) s_spi_fsm_d = `SPI_FSM_RDATA;
+            else s_spi_fsm_d = `SPI_FSM_WDATA;
+          end else s_spi_fsm_d = `SPI_FSM_IDLE;
+        end
       end
       `SPI_FSM_WDATA: begin
+        if (s_trans_done) s_spi_fsm_d = `SPI_FSM_IDLE;
       end
       `SPI_FSM_RDATA: begin
+        if (s_trans_done) s_spi_fsm_d = `SPI_FSM_IDLE;
       end
       default: s_spi_fsm_d = `SPI_FSM_IDLE;
     endcase
@@ -114,13 +206,12 @@ module spi_core (
       s_spi_fsm_q
   );
 
+  // 8B
 
   // cmd: 8, shift-1, -2, -4
   // addr: 8~32b, shift-1, -2, -4
   // altr: 8~32b, shift-1, -2, -4
   // data: mulit 8~32b, shift-1, -2, -4
-  // spi_io_en_o, spi_io_out_o
-
   always_comb begin
     spi_io_en_o  = '0;  // high-z
     spi_io_out_o = '0;
@@ -136,7 +227,7 @@ module spi_core (
             spi_io_en_o[1]  = 1'b0;
             spi_io_en_o[2]  = 1'b1;
             spi_io_en_o[3]  = 1'b1;
-            spi_io_out_o[0] = s_tx_shift_1;
+            spi_io_out_o[0] = s_tx_shift_1_dat;
             spi_io_out_o[2] = 1'b0;
             spi_io_out_o[3] = 1'b1;
           end
@@ -145,8 +236,8 @@ module spi_core (
             spi_io_en_o[1]  = 1'b1;
             spi_io_en_o[2]  = 1'b1;
             spi_io_en_o[3]  = 1'b1;
-            spi_io_out_o[0] = s_tx_shift_2[0];
-            spi_io_out_o[1] = s_tx_shift_2[1];
+            spi_io_out_o[0] = s_tx_shift_2_dat[0];
+            spi_io_out_o[1] = s_tx_shift_2_dat[1];
             spi_io_out_o[2] = 1'b0;
             spi_io_out_o[3] = 1'b1;
           end
@@ -155,17 +246,17 @@ module spi_core (
             spi_io_en_o[1]  = 1'b1;
             spi_io_en_o[2]  = 1'b1;
             spi_io_en_o[3]  = 1'b1;
-            spi_io_out_o[0] = s_tx_shift_4[0];
-            spi_io_out_o[1] = s_tx_shift_4[1];
-            spi_io_out_o[2] = s_tx_shift_4[2];
-            spi_io_out_o[3] = s_tx_shift_4[3];
+            spi_io_out_o[0] = s_tx_shift_4_dat[0];
+            spi_io_out_o[1] = s_tx_shift_4_dat[1];
+            spi_io_out_o[2] = s_tx_shift_4_dat[2];
+            spi_io_out_o[3] = s_tx_shift_4_dat[3];
           end
           default: begin
             spi_io_en_o[0]  = 1'b1;
             spi_io_en_o[1]  = 1'b0;
             spi_io_en_o[2]  = 1'b1;
             spi_io_en_o[3]  = 1'b1;
-            spi_io_out_o[0] = s_tx_shift_1;
+            spi_io_out_o[0] = s_tx_shift_1_dat;
             spi_io_out_o[2] = 1'b0;
             spi_io_out_o[3] = 1'b1;
           end
@@ -178,7 +269,7 @@ module spi_core (
             spi_io_en_o[1]  = 1'b0;
             spi_io_en_o[2]  = 1'b1;
             spi_io_en_o[3]  = 1'b1;
-            spi_io_out_o[0] = s_tx_shift_1;
+            spi_io_out_o[0] = s_tx_shift_1_dat;
             spi_io_out_o[2] = 1'b0;
             spi_io_out_o[3] = 1'b1;
           end
@@ -187,8 +278,8 @@ module spi_core (
             spi_io_en_o[1]  = 1'b1;
             spi_io_en_o[2]  = 1'b1;
             spi_io_en_o[3]  = 1'b1;
-            spi_io_out_o[0] = s_tx_shift_2[0];
-            spi_io_out_o[1] = s_tx_shift_2[1];
+            spi_io_out_o[0] = s_tx_shift_2_dat[0];
+            spi_io_out_o[1] = s_tx_shift_2_dat[1];
             spi_io_out_o[2] = 1'b0;
             spi_io_out_o[3] = 1'b1;
           end
@@ -197,17 +288,17 @@ module spi_core (
             spi_io_en_o[1]  = 1'b1;
             spi_io_en_o[2]  = 1'b1;
             spi_io_en_o[3]  = 1'b1;
-            spi_io_out_o[0] = s_tx_shift_4[0];
-            spi_io_out_o[1] = s_tx_shift_4[1];
-            spi_io_out_o[2] = s_tx_shift_4[2];
-            spi_io_out_o[3] = s_tx_shift_4[3];
+            spi_io_out_o[0] = s_tx_shift_4_dat[0];
+            spi_io_out_o[1] = s_tx_shift_4_dat[1];
+            spi_io_out_o[2] = s_tx_shift_4_dat[2];
+            spi_io_out_o[3] = s_tx_shift_4_dat[3];
           end
           default: begin
             spi_io_en_o[0]  = 1'b1;
             spi_io_en_o[1]  = 1'b0;
             spi_io_en_o[2]  = 1'b1;
             spi_io_en_o[3]  = 1'b1;
-            spi_io_out_o[0] = s_tx_shift_1;
+            spi_io_out_o[0] = s_tx_shift_1_dat;
             spi_io_out_o[2] = 1'b0;
             spi_io_out_o[3] = 1'b1;
           end
@@ -220,7 +311,7 @@ module spi_core (
             spi_io_en_o[1]  = 1'b0;
             spi_io_en_o[2]  = 1'b1;
             spi_io_en_o[3]  = 1'b1;
-            spi_io_out_o[0] = s_tx_shift_1;
+            spi_io_out_o[0] = s_tx_shift_1_dat;
             spi_io_out_o[2] = 1'b0;
             spi_io_out_o[3] = 1'b1;
           end
@@ -229,8 +320,8 @@ module spi_core (
             spi_io_en_o[1]  = 1'b1;
             spi_io_en_o[2]  = 1'b1;
             spi_io_en_o[3]  = 1'b1;
-            spi_io_out_o[0] = s_tx_shift_2[0];
-            spi_io_out_o[1] = s_tx_shift_2[1];
+            spi_io_out_o[0] = s_tx_shift_2_dat[0];
+            spi_io_out_o[1] = s_tx_shift_2_dat[1];
             spi_io_out_o[2] = 1'b0;
             spi_io_out_o[3] = 1'b1;
           end
@@ -239,17 +330,17 @@ module spi_core (
             spi_io_en_o[1]  = 1'b1;
             spi_io_en_o[2]  = 1'b1;
             spi_io_en_o[3]  = 1'b1;
-            spi_io_out_o[0] = s_tx_shift_4[0];
-            spi_io_out_o[1] = s_tx_shift_4[1];
-            spi_io_out_o[2] = s_tx_shift_4[2];
-            spi_io_out_o[3] = s_tx_shift_4[3];
+            spi_io_out_o[0] = s_tx_shift_4_dat[0];
+            spi_io_out_o[1] = s_tx_shift_4_dat[1];
+            spi_io_out_o[2] = s_tx_shift_4_dat[2];
+            spi_io_out_o[3] = s_tx_shift_4_dat[3];
           end
           default: begin
             spi_io_en_o[0]  = 1'b1;
             spi_io_en_o[1]  = 1'b0;
             spi_io_en_o[2]  = 1'b1;
             spi_io_en_o[3]  = 1'b1;
-            spi_io_out_o[0] = s_tx_shift_1;
+            spi_io_out_o[0] = s_tx_shift_1_dat;
             spi_io_out_o[2] = 1'b0;
             spi_io_out_o[3] = 1'b1;
           end
@@ -266,7 +357,7 @@ module spi_core (
             spi_io_en_o[1]  = 1'b0;
             spi_io_en_o[2]  = 1'b1;
             spi_io_en_o[3]  = 1'b1;
-            spi_io_out_o[0] = s_tx_shift_1;
+            spi_io_out_o[0] = s_tx_shift_1_dat;
             spi_io_out_o[2] = 1'b0;
             spi_io_out_o[3] = 1'b1;
           end
@@ -275,8 +366,8 @@ module spi_core (
             spi_io_en_o[1]  = 1'b1;
             spi_io_en_o[2]  = 1'b1;
             spi_io_en_o[3]  = 1'b1;
-            spi_io_out_o[0] = s_tx_shift_2[0];
-            spi_io_out_o[1] = s_tx_shift_2[1];
+            spi_io_out_o[0] = s_tx_shift_2_dat[0];
+            spi_io_out_o[1] = s_tx_shift_2_dat[1];
             spi_io_out_o[2] = 1'b0;
             spi_io_out_o[3] = 1'b1;
           end
@@ -285,17 +376,17 @@ module spi_core (
             spi_io_en_o[1]  = 1'b1;
             spi_io_en_o[2]  = 1'b1;
             spi_io_en_o[3]  = 1'b1;
-            spi_io_out_o[0] = s_tx_shift_4[0];
-            spi_io_out_o[1] = s_tx_shift_4[1];
-            spi_io_out_o[2] = s_tx_shift_4[2];
-            spi_io_out_o[3] = s_tx_shift_4[3];
+            spi_io_out_o[0] = s_tx_shift_4_dat[0];
+            spi_io_out_o[1] = s_tx_shift_4_dat[1];
+            spi_io_out_o[2] = s_tx_shift_4_dat[2];
+            spi_io_out_o[3] = s_tx_shift_4_dat[3];
           end
           default: begin
             spi_io_en_o[0]  = 1'b1;
             spi_io_en_o[1]  = 1'b0;
             spi_io_en_o[2]  = 1'b1;
             spi_io_en_o[3]  = 1'b1;
-            spi_io_out_o[0] = s_tx_shift_1;
+            spi_io_out_o[0] = s_tx_shift_1_dat;
             spi_io_out_o[2] = 1'b0;
             spi_io_out_o[3] = 1'b1;
           end
@@ -308,7 +399,7 @@ module spi_core (
             spi_io_en_o[1]  = 1'b0;
             spi_io_en_o[2]  = 1'b1;
             spi_io_en_o[3]  = 1'b1;
-            spi_io_out_o[0] = s_tx_shift_1;
+            spi_io_out_o[0] = s_tx_shift_1_dat;
             spi_io_out_o[2] = 1'b0;
             spi_io_out_o[3] = 1'b1;
           end
@@ -337,7 +428,7 @@ module spi_core (
             spi_io_en_o[1]  = 1'b0;
             spi_io_en_o[2]  = 1'b1;
             spi_io_en_o[3]  = 1'b1;
-            spi_io_out_o[0] = s_tx_shift_1;
+            spi_io_out_o[0] = s_tx_shift_1_dat;
             spi_io_out_o[2] = 1'b0;
             spi_io_out_o[3] = 1'b1;
           end
@@ -350,106 +441,105 @@ module spi_core (
     endcase
   end
 
+  // split the data into 8b type
   always_comb begin
-    s_tx_shift_1 = s_tx_multi_shift_1[0];
-    s_tx_shift_2 = s_tx_multi_shift_2[0];
-    s_tx_shift_4 = s_tx_multi_shift_4[0];
+    s_tx_data  = '0;
+    s_sg_cnt_d = '0;
     unique case (s_spi_fsm_q)
-      `SPI_FSM_IDLE: begin
-        s_tx_shift_1 = s_tx_multi_shift_1[0];
-        s_tx_shift_2 = s_tx_multi_shift_2[0];
-        s_tx_shift_4 = s_tx_multi_shift_4[0];
-      end
-      `SPI_FSM_CMD: begin
-        s_tx_shift_1 = s_tx_multi_shift_1[0];
-        s_tx_shift_2 = s_tx_multi_shift_2[0];
-        s_tx_shift_4 = s_tx_multi_shift_4[0];
-      end
+      `SPI_FSM_IDLE: s_tx_data = '0;
+      `SPI_FSM_CMD:  s_tx_data = cmd_i;
       `SPI_FSM_ADDR: begin
-        s_tx_shift_1 = s_tx_multi_shift_1[asize_i];
-        s_tx_shift_2 = s_tx_multi_shift_2[asize_i];
-        s_tx_shift_4 = s_tx_multi_shift_4[asize_i];
+        // 8~32b split
+        // asize_i: 
+        // 0->[7:0]
+        // 1->[15:8] [7:0]
+        // 2->[23:16] [15:8] [7:0]
+        // 3->[31:24] [23:16] [15:8] [7:0]
+        if (s_sg_cnt_q == '0) s_sg_cnt_d = asize_i + 1'b1;
+        else s_sg_cnt_d = s_sg_cnt_q - 1'b1;
+        s_tx_data = addr_i[s_sg_cnt_d*8-1-:8];
       end
       `SPI_FSM_ALTR: begin
-        s_tx_shift_1 = s_tx_multi_shift_1[alsize_i];
-        s_tx_shift_2 = s_tx_multi_shift_2[alsize_i];
-        s_tx_shift_4 = s_tx_multi_shift_4[alsize_i];
+        if (s_sg_cnt_q == '0) s_sg_cnt_d = alsize_i + 1'b1;
+        else s_sg_cnt_d = s_sg_cnt_q - 1'b1;
+        s_tx_data = addr_i[s_sg_cnt_d*8-1-:8];
       end
-      `SPI_FSM_NOP: begin
-        s_tx_shift_1 = '0;
-        s_tx_shift_2 = '0;
-        s_tx_shift_4 = '0;
+      `SPI_FSM_NOP: begin  // dely_cnt to calc the period of the sck
+        s_tx_data  = '0;
+        s_sg_cnt_d = '0;
       end
-      `SPI_FSM_WDATA: begin
-        s_tx_shift_1 = s_tx_multi_shift_1[dsize_i];
-        s_tx_shift_2 = s_tx_multi_shift_2[dsize_i];
-        s_tx_shift_4 = s_tx_multi_shift_4[dsize_i];
+      `SPI_FSM_WDATA: begin  // 
+        if (s_sg_cnt_q == '0) s_sg_cnt_d = dsize_i + 1'b1;
+        else s_sg_cnt_d = s_sg_cnt_q - 1'b1;
+        s_tx_data = tx_data_i[s_sg_cnt_d*8-1-:8];
       end
       `SPI_FSM_RDATA: begin
-        s_tx_shift_1 = s_tx_multi_shift_1[0];
-        s_tx_shift_2 = s_tx_multi_shift_2[0];
-        s_tx_shift_4 = s_tx_multi_shift_4[0];
+        s_tx_data  = '0;
+        s_sg_cnt_d = '0;
       end
       default: begin
-        s_tx_shift_1 = s_tx_multi_shift_1[0];
-        s_tx_shift_2 = s_tx_multi_shift_2[0];
-        s_tx_shift_4 = s_tx_multi_shift_4[0];
+        s_tx_data  = '0;
+        s_sg_cnt_d = '0;
       end
     endcase
   end
+  dffr #(3) u_sg_cnt_dffr (
+      clk_i,
+      rst_n_i,
+      s_sg_cnt_d,
+      s_sg_cnt_q
+  );
 
-  for (genvar i = 1; i <= 4; i++) begin : SPI_TX_SHIFT_1_BLOCK
-    shift_reg #(
-        .DATA_WIDTH(8 * i),
-        .SHIFT_NUM (1)
-    ) u_std_spi_tx_shift_reg (
-        .clk_i     (clk_i),
-        .rst_n_i   (rst_n_i),
-        .type_i    (`SHIFT_REG_TYPE_LOGIC),
-        .dir_i     ({1'b0, lsb_i}),
-        .ld_en_i   (),
-        .sft_en_i  (s_tx_trg),
-        .ser_dat_i ('0),
-        .par_data_i(),
-        .ser_dat_o (s_tx_multi_shift_1[i-1]),
-        .par_data_o()
-    );
-  end
 
-  for (genvar i = 1; i <= 4; i++) begin : SPI_TX_SHIFT_2_BLOCK
-    shift_reg #(
-        .DATA_WIDTH(8 * i),
-        .SHIFT_NUM (2)
-    ) u_std_spi_tx_shift_reg (
-        .clk_i     (clk_i),
-        .rst_n_i   (rst_n_i),
-        .type_i    (`SHIFT_REG_TYPE_LOGIC),
-        .dir_i     ({1'b0, lsb_i}),
-        .ld_en_i   (),
-        .sft_en_i  (s_tx_trg),
-        .ser_dat_i ('0),
-        .par_data_i(),
-        .ser_dat_o (s_tx_multi_shift_2[i-1]),
-        .par_data_o()
-    );
-  end
 
-  for (genvar i = 1; i <= 4; i++) begin : SPI_TX_SHIFT_4_BLOCK
-    shift_reg #(
-        .DATA_WIDTH(8 * i),
-        .SHIFT_NUM (4)
-    ) u_std_spi_tx_shift_reg (
-        .clk_i     (clk_i),
-        .rst_n_i   (rst_n_i),
-        .type_i    (`SHIFT_REG_TYPE_LOGIC),
-        .dir_i     ({1'b0, lsb_i}),
-        .ld_en_i   (),
-        .sft_en_i  (s_tx_trg),
-        .ser_dat_i ('0),
-        .par_data_i(),
-        .ser_dat_o (s_tx_multi_shift_4[i-1]),
-        .par_data_o()
-    );
-  end
+
+
+  shift_reg #(
+      .DATA_WIDTH(8),
+      .SHIFT_NUM (1)
+  ) u_std_spi_tx_shift_reg (
+      .clk_i     (clk_i),
+      .rst_n_i   (rst_n_i),
+      .type_i    (`SHIFT_REG_TYPE_LOGIC),
+      .dir_i     ({1'b0, lsb_i}),
+      .ld_en_i   (s_tx_shift_1_ld),
+      .sft_en_i  (s_tx_trg),
+      .ser_dat_i ('0),
+      .par_data_i(s_tx_data),
+      .ser_dat_o (s_tx_shift_1_dat),
+      .par_data_o()
+  );
+
+  shift_reg #(
+      .DATA_WIDTH(8),
+      .SHIFT_NUM (2)
+  ) u_dual_spi_tx_shift_reg (
+      .clk_i     (clk_i),
+      .rst_n_i   (rst_n_i),
+      .type_i    (`SHIFT_REG_TYPE_LOGIC),
+      .dir_i     ({1'b0, lsb_i}),
+      .ld_en_i   (s_tx_shift_2_ld),
+      .sft_en_i  (s_tx_trg),
+      .ser_dat_i ('0),
+      .par_data_i(s_tx_data),
+      .ser_dat_o (s_tx_shift_2_dat),
+      .par_data_o()
+  );
+
+  shift_reg #(
+      .DATA_WIDTH(8),
+      .SHIFT_NUM (4)
+  ) u_quad_spi_tx_shift_reg (
+      .clk_i     (clk_i),
+      .rst_n_i   (rst_n_i),
+      .type_i    (`SHIFT_REG_TYPE_LOGIC),
+      .dir_i     ({1'b0, lsb_i}),
+      .ld_en_i   (s_tx_shift_4_ld),
+      .sft_en_i  (s_tx_trg),
+      .ser_dat_i ('0),
+      .par_data_i(s_tx_data),
+      .ser_dat_o (s_tx_shift_4_dat),
+      .par_data_o()
+  );
 
 endmodule

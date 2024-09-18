@@ -28,7 +28,7 @@
  * PERMS:  | NONE  | RW    | RW    | RW     | RW     | RW    | RW    | RW    |
  * ------------------------------------------------------------------------------
  * SPI_CMD:
- * BITS:   | 31:16 | 15:0 |
+ * BITS:   | 31:8  | 7:0 |
  * FIELDS: | RES   | CMD  |
  * PERMS:  | NONE  | RW   |
  * ------------------------------------------------------------------------------
@@ -97,7 +97,7 @@
 `define SPI_CTRL_WIDTH  9
 `define SPI_FMT_WIDTH   27
 `define SPI_FRAME_WIDTH 14
-`define SPI_CMD_WIDTH   16
+`define SPI_CMD_WIDTH   8
 `define SPI_ADDR_WIDTH  32
 `define SPI_ALTR_WIDTH  32
 `define SPI_NOP_WIDTH   16
@@ -108,9 +108,10 @@
 
 `define SPI_NSS_NUM 1
 
-`define SPI_STD_SPI  2'b00
-`define SPI_DUAL_SPI 2'b01
-`define SPI_QUAD_SPI 2'b10
+`define SPI_SKIP     2'b00
+`define SPI_STD_SPI  2'b01
+`define SPI_DUAL_SPI 2'b10
+`define SPI_QUAD_SPI 2'b11
 
 `define SPI_TRANS_8_BITS  2'b00
 `define SPI_TRANS_16_BITS 2'b01

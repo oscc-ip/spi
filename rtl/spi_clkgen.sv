@@ -20,6 +20,7 @@ module spi_clkgen (
     input  logic       cpol_i,
     input  logic [7:0] div_i,
     input  logic       last_i,
+    output logic       clk_trg_o,
     output logic       clk_o,
     output logic       pos_edge_o,
     output logic       neg_edge_o
@@ -47,10 +48,12 @@ module spi_clkgen (
 
   always_comb begin
     s_spi_clk_d = s_spi_clk_q;
+    clk_trg_o   = '0;
     if (~busy_i) begin
       s_spi_clk_d = cpol_i;
     end else if (busy_i && s_is_zero && (~last_i || (s_spi_clk_q ^ cpol_i))) begin
       s_spi_clk_d = ~s_spi_clk_q;
+      clk_trg_o   = 1'b1;
     end
   end
   dffr #(1) u_spi_clk_dffr (
