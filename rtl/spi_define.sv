@@ -12,120 +12,89 @@
 `define INC_SPI_DEF_SV
 
 /* register mapping
- * SPI_CTRL:
- * BITS:   | 31:9 | 8:5 | 4   | 3  | 2    | 1    | 0  |
- * FIELDS: | RES  | NSS | RWM | ST | RXIE | TXIE | EN |
- * PERMS:  | NONE | RW  | RW  | RW | RW   | RW   | RW |
- * ------------------------------------------------------------------------------
- * SPI_FMT:
- * BITS:   | 31:27 | 26:22 | 21:17 | 16:9 | 8:5 | 4   | 3   | 2   | 1    | 0    |
- * FIELDS: | RES   | RXTH  | TXTH  | DIV  | CSV | ASS | RDM | LSB | CPOL | CPHA |
- * PERMS:  | NONE  | RW    | RW    | RW   | RW  | RW  | RW  | RW  | RW   | RW   |
- * ------------------------------------------------------------------------------
- * SPI_FRAME:
- * BITS:   | 31:14 | 13:12 | 11:10 | 9:8    | 7:6    | 5:4   | 3:2   | 1:0   |
- * FIELDS: | RES   | DSIZE | DMODE | ALSIZE | ALMODE | ASIZE | AMODE | CMODE |
- * PERMS:  | NONE  | RW    | RW    | RW     | RW     | RW    | RW    | RW    |
- * ------------------------------------------------------------------------------
- * SPI_CMD:
- * BITS:   | 31:8  | 7:0 |
- * FIELDS: | RES   | CMD  |
- * PERMS:  | NONE  | RW   |
- * ------------------------------------------------------------------------------
- * SPI_ADDR:
- * BITS:   | 31:0 |
- * FIELDS: | ADDR |
- * PERMS:  | RW   |
- * ------------------------------------------------------------------------------
- * SPI_ALTR:
- * BITS:   | 31:0 |
- * FIELDS: | ALTR |
- * PERMS:  | RW   |
- * ------------------------------------------------------------------------------
- * SPI_NOP:
+ * SPI_CTRL1:
+ * BITS:   | 31:22 | 21:20 | 19:15 | 14:10 | 9:8  | 7:6  | 5    | 4   | 3   | 2   | 1    | 0    |
+ * FIELDS: | RES   | SPM   | RXTH  | TXTH  | RDTB | TDTB | SSTR | RDM | ASS | LSB | CPOL | CPHA |
+ * PERMS:  | NONE  | RW    | RW    | RW    | RW   | RW   | RW   | RW  | RW  | RW  | RW   | RW   |
+ * ----------------------------------------------------------------------------------------------
+ * SPI_CTRL2:
+ * BITS:   | 31:17 | 16:13 | 12:9 | 8:5 | 4   | 3  | 2  | 1    | 0    |
+ * FIELDS: | RES   | SNM   | CSV  | NSS | RWM | ST | EN | RXIE | TXIE |
+ * PERMS:  | NONE  | RW    | RW   | RW  | RW  | RW | RW | RW   | RW   |
+ * ----------------------------------------------------------------------------------------------
+ * SPI_DIV:
  * BITS:   | 31:16 | 15:0 |
- * FIELDS: | RES   | NOP  |
+ * FIELDS: | RES   | DIV  |
  * PERMS:  | NONE  | RW   |
- * ------------------------------------------------------------------------------
+ * ----------------------------------------------------------------------------------------------
+ * SPI_CAL:
+ * BITS:   | 31:16 | 15:0 |
+ * FIELDS: | RES   | CAL  |
+ * PERMS:  | NONE  | RW   |
+ * ----------------------------------------------------------------------------------------------
  * SPI_TRL:
  * BITS:   | 31:16 | 15:0 |
  * FIELDS: | RES   | TRL  |
  * PERMS:  | NONE  | WO   |
- * ------------------------------------------------------------------------------
+ * ----------------------------------------------------------------------------------------------
  * SPI_TXR:
  * BITS:   | 31:0   |
  * FIELDS: | TXDATA |
  * PERMS:  | WO     |
- * ------------------------------------------------------------------------------
+ * ----------------------------------------------------------------------------------------------
  * SPI_RXR:
  * BITS:   | 31:0   |
  * FIELDS: | RXDATA |
  * PERMS:  | RO     |
- * ------------------------------------------------------------------------------
+ * ----------------------------------------------------------------------------------------------
  * SPI_STAT:
  * BITS:   | 31:5 | 4    | 3    | 2    | 1    | 0    |
  * FIELDS: | RES  | RETY | TFUL | BUSY | RXIF | TXIF |
  * PERMS:  | NONE | RO   | RO   | RO   | RO   | RO   |
- * ------------------------------------------------------------------------------
+ * ----------------------------------------------------------------------------------------------
 */
 
 // verilog_format: off
-`define SPI_CTRL  4'b0000 // BASEADDR + 0x00
-`define SPI_FMT   4'b0001 // BASEADDR + 0x04
-`define SPI_FRAME 4'b0010 // BASEADDR + 0x08
-`define SPI_CMD   4'b0011 // BASEADDR + 0x0C
-`define SPI_ADDR  4'b0100 // BASEADDR + 0x10
-`define SPI_ALTR  4'b0101 // BASEADDR + 0x14
-`define SPI_NOP   4'b0110 // BASEADDR + 0x18
-`define SPI_TRL   4'b0111 // BASEADDR + 0x1C
-`define SPI_TXR   4'b1000 // BASEADDR + 0x20
-`define SPI_RXR   4'b1001 // BASEADDR + 0x24
-`define SPI_STAT  4'b1010 // BASEADDR + 0x28
+`define SPI_CTRL1 4'b0000 // BASEADDR + 0x00
+`define SPI_CTRL2 4'b0001 // BASEADDR + 0x04
+`define SPI_DIV   4'b0010 // BASEADDR + 0x08
+`define SPI_CAL   4'b0011 // BASEADDR + 0x0C
+`define SPI_TRL   4'b0100 // BASEADDR + 0x10
+`define SPI_TXR   4'b0101 // BASEADDR + 0x14
+`define SPI_RXR   4'b0110 // BASEADDR + 0x18
+`define SPI_STAT  4'b0111 // BASEADDR + 0x1C
 
-`define SPI_CTRL_ADDR  {26'b0, `SPI_CTRL,  2'b00}
-`define SPI_FMT_ADDR   {26'b0, `SPI_FMT,   2'b00}
-`define SPI_FRAME_ADDR {26'b0, `SPI_FRAME, 2'b00}
-`define SPI_CMD_ADDR   {26'b0, `SPI_CMD,   2'b00}
-`define SPI_ADDR_ADDR  {26'b0, `SPI_ADDR,  2'b00}
-`define SPI_ALTR_ADDR  {26'b0, `SPI_ALTR,  2'b00}
-`define SPI_NOP_ADDR   {26'b0, `SPI_NOP,   2'b00}
+`define SPI_CTRL1_ADDR {26'b0, `SPI_CTRL1, 2'b00}
+`define SPI_CTRL2_ADDR {26'b0, `SPI_CTRL2, 2'b00}
+`define SPI_DIV_ADDR   {26'b0, `SPI_DIV,   2'b00}
+`define SPI_CAL_ADDR   {26'b0, `SPI_CAL,   2'b00}
 `define SPI_TRL_ADDR   {26'b0, `SPI_TRL,   2'b00}
 `define SPI_TXR_ADDR   {26'b0, `SPI_TXR,   2'b00}
 `define SPI_RXR_ADDR   {26'b0, `SPI_RXR,   2'b00}
 `define SPI_STAT_ADDR  {26'b0, `SPI_STAT,  2'b00}
 
-`define SPI_CTRL_WIDTH  9
-`define SPI_FMT_WIDTH   27
-`define SPI_FRAME_WIDTH 14
-`define SPI_CMD_WIDTH   8
-`define SPI_ADDR_WIDTH  32
-`define SPI_ALTR_WIDTH  32
-`define SPI_NOP_WIDTH   16
+`define SPI_DATA_WIDTH 32
+`define SPI_DATA_BIT_WIDTH $clog2(`SPI_DATA_WIDTH)
+
+`define SPI_CTRL1_WIDTH 22
+`define SPI_CTRL2_WIDTH 17
+`define SPI_DIV_WIDTH   16
+`define SPI_CAL_WIDTH   16
 `define SPI_TRL_WIDTH   16
-`define SPI_TXR_WIDTH   32
-`define SPI_RXR_WIDTH   32
+`define SPI_TXR_WIDTH   `SPI_DATA_WIDTH
+`define SPI_RXR_WIDTH   `SPI_DATA_WIDTH
 `define SPI_STAT_WIDTH  5
 
-`define SPI_NSS_NUM 1
+`define SPI_STD_SPI  2'b00
+`define SPI_DUAL_SPI 2'b01
+`define SPI_QUAD_SPI 2'b10
+`define SPI_QSPI     2'b11
 
-`define SPI_SKIP     2'b00
-`define SPI_STD_SPI  2'b01
-`define SPI_DUAL_SPI 2'b10
-`define SPI_QUAD_SPI 2'b11
-
+`define SPI_NSS_NUM       1
 `define SPI_TRANS_8_BITS  2'b00
 `define SPI_TRANS_16_BITS 2'b01
 `define SPI_TRANS_24_BITS 2'b10
 `define SPI_TRANS_32_BITS 2'b11
-
-`define SPI_FSM_IDLE  3'b000
-`define SPI_FSM_CMD   3'b001
-`define SPI_FSM_ADDR  3'b010
-`define SPI_FSM_ALTR  3'b011
-`define SPI_FSM_NOP   3'b100
-`define SPI_FSM_WDATA 3'b101
-`define SPI_FSM_RDATA 3'b110
-
 // verilog_format: on
 
 // io0(mosi)

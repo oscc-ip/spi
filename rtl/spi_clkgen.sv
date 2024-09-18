@@ -11,35 +11,33 @@
 `include "register.sv"
 `include "spi_define.sv"
 
-// sck : clk_i / ((div_i + 1) * 2)
 module spi_clkgen (
-    input  logic       clk_i,
-    input  logic       rst_n_i,
-    input  logic       busy_i,
-    input  logic       st_i,
-    input  logic       cpol_i,
-    input  logic [7:0] div_i,
-    input  logic       last_i,
-    output logic       clk_trg_o,
-    output logic       clk_o,
-    output logic       pos_edge_o,
-    output logic       neg_edge_o
+    input  logic                      clk_i,
+    input  logic                      rst_n_i,
+    input  logic                      busy_i,
+    input  logic                      st_i,
+    input  logic                      cpol_i,
+    input  logic [`SPI_DIV_WIDTH-1:0] clk_div_i,
+    input  logic                      last_i,
+    output logic                      clk_o,
+    output logic                      pos_edge_o,
+    output logic                      neg_edge_o
 );
 
-  logic [7:0] s_cnt_d, s_cnt_q;
+  logic [`SPI_DIV_WIDTH-1:0] s_cnt_d, s_cnt_q;
   logic s_spi_clk_d, s_spi_clk_q;
   logic s_spi_pos_edge_d, s_spi_pos_edge_q;
   logic s_spi_neg_edge_d, s_spi_neg_edge_q;
   logic s_is_zero, s_is_one;
 
   assign s_is_zero  = s_cnt_q == '0;
-  assign s_is_one   = s_cnt_q == {{7{1'b0}}, 1'b1};
+  assign s_is_one   = s_cnt_q == {{(`SPI_DIV_WIDTH - 1) {1'b0}}, 1'b1};
   assign clk_o      = s_spi_clk_q;
   assign pos_edge_o = s_spi_pos_edge_q;
   assign neg_edge_o = s_spi_neg_edge_q;
 
-  assign s_cnt_d    = (~busy_i || s_is_zero) ? div_i : s_cnt_q - 1'b1;
-  dffrh #(8) u_cnt_dffrh (
+  assign s_cnt_d    = (~busy_i || s_is_zero) ? clk_div_i : s_cnt_q - 1'b1;
+  dffrh #(`SPI_DIV_WIDTH) u_cnt_dffrh (
       clk_i,
       rst_n_i,
       s_cnt_d,
@@ -48,12 +46,10 @@ module spi_clkgen (
 
   always_comb begin
     s_spi_clk_d = s_spi_clk_q;
-    clk_trg_o   = '0;
     if (~busy_i) begin
       s_spi_clk_d = cpol_i;
     end else if (busy_i && s_is_zero && (~last_i || (s_spi_clk_q ^ cpol_i))) begin
       s_spi_clk_d = ~s_spi_clk_q;
-      clk_trg_o   = 1'b1;
     end
   end
   dffr #(1) u_spi_clk_dffr (
@@ -64,12 +60,11 @@ module spi_clkgen (
   );
 
 
-  // div_i == 0 : 2-div need to do special judge
+  // clk_div_i == 0 : 2-div need to do special judge
   always_comb begin
     s_spi_pos_edge_d = '0;
     if (busy_i && ~s_spi_clk_q && s_is_one) begin
-      s_spi_pos_edge_d = 1'b1;
-    end else if (div_i == '0) begin
+    end else if (clk_div_i == '0) begin
       if (~cpol_i) begin
         s_spi_pos_edge_d = (s_spi_clk_q || (~busy_i && st_i)) && ~last_i;
       end else begin
@@ -88,7 +83,7 @@ module spi_clkgen (
     s_spi_neg_edge_d = '0;
     if (busy_i && s_spi_clk_q && s_is_one) begin
       s_spi_neg_edge_d = 1'b1;
-    end else if (div_i == '0) begin
+    end else if (clk_div_i == '0) begin
       if (cpol_i) begin
         s_spi_neg_edge_d = (~s_spi_clk_q || (~busy_i && st_i)) && ~last_i;
       end else begin

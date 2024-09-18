@@ -12,534 +12,387 @@
 `include "edge_det.sv"
 `include "spi_define.sv"
 
-module spi_core #(
-    parameter int FIFO_DEPTH = 64
-) (
-    input  logic                      clk_i,
-    input  logic                      rst_n_i,
-    input  logic                      en_i,
-    input  logic [               3:0] nss_i,
-    input  logic [               3:0] csv_i,
-    input  logic                      ass_i,
-    input  logic                      lsb_i,
-    input  logic                      st_i,
-    input  logic                      rwm_i,
-    input  logic [               1:0] cmode_i,
-    input  logic [               1:0] amode_i,
-    input  logic [               1:0] asize_i,
-    input  logic [               1:0] almode_i,
-    input  logic [               1:0] alsize_i,
-    input  logic [               1:0] dmode_i,
-    input  logic [               1:0] dsize_i,
-    input  logic [               7:0] cmd_i,
-    input  logic [              31:0] addr_i,
-    input  logic [              31:0] altr_i,
-    input  logic [              15:0] nop_i,
-    input  logic [`SPI_TRL_WIDTH-1:0] trl_i,
-    input  logic                      cpol_i,
-    input  logic                      cpha_i,
-    input  logic [               7:0] div_i,
-    output logic                      busy_o,
-    output logic                      last_o,
-    input  logic                      tx_valid_i,
-    output logic                      tx_ready_o,
-    input  logic [              31:0] tx_data_i,
-    output logic                      rx_valid_o,
-    input  logic                      rx_ready_i,
-    output logic [              31:0] rx_data_o,
-    output logic                      spi_sck_o,
-    output logic [  `SPI_NSS_NUM-1:0] spi_nss_o,
-    output logic [               3:0] spi_io_en_o,
-    input  logic [               3:0] spi_io_in_i,
-    output logic [               3:0] spi_io_out_o
+module spi_core (
+    input  logic                       clk_i,
+    input  logic                       rst_n_i,
+    input  logic                       lsb_i,
+    input  logic                       st_i,
+    input  logic                       rwm_i,
+    input  logic                       pos_edge_i,
+    input  logic                       neg_edge_i,
+    input  logic                       cpol_i,
+    input  logic                       cpha_i,
+    input  logic [                1:0] tdtb_i,
+    input  logic [                1:0] rdtb_i,
+    input  logic [                1:0] spm_i,
+    input  logic [                3:0] snm_i,
+    input  logic [ `SPI_CAL_WIDTH-1:0] cal_i,
+    input  logic                       trl_valid_i,
+    input  logic [ `SPI_TRL_WIDTH-1:0] trl_i,
+    output logic                       busy_o,
+    output logic                       last_o,
+    input  logic                       tx_valid_i,
+    output logic                       tx_ready_o,
+    input  logic [`SPI_DATA_WIDTH-1:0] tx_data_i,
+    output logic                       rx_valid_o,
+    input  logic                       rx_ready_i,
+    output logic [`SPI_DATA_WIDTH-1:0] rx_data_o,
+    output logic [                3:0] spi_io_en_o,
+    input  logic [                3:0] spi_io_in_i,
+    output logic [                3:0] spi_io_out_o
 );
 
-  logic s_pos_edge, s_neg_edge, s_clk_trg, s_tx_trg;
-  logic s_trans_done, s_dely_done;
+  logic [`SPI_DATA_BIT_WIDTH+1:0] s_tran_cnt_d, s_tran_cnt_q;
+  logic [`SPI_TRL_WIDTH-1:0] s_trl_d, s_trl_q;
+  logic s_trl_en;
+  logic [`SPI_DATA_WIDTH-1:0] s_tx_data_d, s_tx_data_q;
+  logic s_tx_data_en;
+  logic [`SPI_DATA_WIDTH-1:0] s_rx_data_d, s_rx_data_q;
+  logic s_busy_d, s_busy_q;
+  logic [3:0] s_ser_cnt_d, s_ser_cnt_q;
+  logic s_rx_data_en, s_par_trg;
+  logic s_tran_done, s_tran_done_fe_trg, s_st_re_trg, s_st_fe_trg, s_tx_trg, s_rx_trg;
+  logic [ 3:0] s_std_mosi;
+  logic [ 1:0] s_dual_io     [0:3];
+  logic [ 1:0] s_dual_wr_data[0:3];
+  logic [ 3:0] s_quad_io     [0:3];
+  logic [ 3:0] s_quad_wr_data[0:3];
+  logic [31:0] s_std_rd_data [0:3];
+  logic [31:0] s_dual_rd_data[0:3];
+  logic [31:0] s_quad_rd_data[0:3];
 
-  logic [3:0] s_nss_sel;
-  logic [7:0] s_tx_data;
+  // rx trg need to delay one cycle
+  assign s_tran_done = ~(|s_tran_cnt_q);
+  assign s_tx_trg    = (cpol_i ^ cpha_i ? pos_edge_i : neg_edge_i) && ~last_o;
+  assign s_rx_trg    = (cpol_i ^ cpha_i ? pos_edge_i : neg_edge_i);
+  assign busy_o      = s_busy_q;
+  assign last_o      = s_tran_done && ~(|s_trl_q);
 
-  logic [2:0] s_spi_fsm_d, s_spi_fsm_q;
-  logic [2:0] s_sg_cnt_d, s_sg_cnt_q;
-  logic [15:0] s_dat_cnt_d, s_dat_cnt_q;
-  logic [15:0] s_dely_cnt_d, s_dely_cnt_q;
+  // spi mode ctrl
+  always_comb begin
+    spi_io_en_o = '1;
+    unique case (spm_i)
+      `SPI_STD_SPI: begin
+        spi_io_en_o[0] = 1'b0;
+        spi_io_en_o[1] = 1'b1;
+      end
+      `SPI_DUAL_SPI: begin
+        if (~rwm_i) begin
+          spi_io_en_o[1:0] = '0;  // wr only oper
+        end else begin  // when par addr mode, set io high-z state
+          spi_io_en_o[0] = s_trl_q <= cal_i ? 1'b1 : 1'b0;
+          spi_io_en_o[1] = snm_i > 4'b1 ? 1'b1 : (s_trl_q <= cal_i ? 1'b1 : 1'b0);
+        end
+      end
+      `SPI_QUAD_SPI: begin
+        if (~rwm_i) begin
+          spi_io_en_o[3:0] = '0;  // wr only oper
+        end else begin
+          spi_io_en_o[0]   = s_trl_q <= cal_i ? 1'b1 : 1'b0;
+          spi_io_en_o[3:1] = snm_i > 4'b1 ? '1 : (s_trl_q <= cal_i ? '1 : '0);
+        end
+      end
+      default: spi_io_en_o = '1;
+    endcase
+  end
 
-  logic s_tx_shift_1_ld, s_tx_shift_2_ld, s_tx_shift_4_ld;
-  logic       s_tx_shift_1_dat;
-  logic [1:0] s_tx_shift_2_dat;
-  logic [3:0] s_tx_shift_4_dat;
+  // spi in/out ctrl
+  always_comb begin
+    spi_io_out_o[3:0] = '0;
+    unique case (spm_i)
+      `SPI_STD_SPI: spi_io_out_o[0] = s_std_mosi[tdtb_i];
+      `SPI_DUAL_SPI: begin
+        spi_io_out_o[0] = s_par_trg ? s_dual_io[tdtb_i][0] : s_std_mosi[0];  // 8b cmd trans
+        spi_io_out_o[1] = s_par_trg ? s_dual_io[tdtb_i][1] : '0;
+      end
+      `SPI_QUAD_SPI: begin
+        spi_io_out_o[0] = s_par_trg ? s_quad_io[tdtb_i][0] : s_std_mosi[0];  // 8b cmd trans
+        spi_io_out_o[1] = s_par_trg ? s_quad_io[tdtb_i][1] : '0;
+        spi_io_out_o[2] = s_par_trg ? s_quad_io[tdtb_i][2] : '0;
+        spi_io_out_o[3] = s_par_trg ? s_quad_io[tdtb_i][3] : '0;
+      end
+      default:      spi_io_out_o[3:0] = '0;
+    endcase
+  end
 
-
-  assign last_o     = '0;
-  assign tx_ready_o = '0;
-  assign rx_valid_o = '0;
-  assign rx_data_o  = '0;
-
-  // software nss ctrl is more flexible
-  assign s_nss_sel  = (nss_i & {4{busy_o & ass_i}}) | (nss_i & {4{~ass_i}});
-  assign spi_nss_o  = ~(s_nss_sel[`SPI_NSS_NUM-1:0] ^ csv_i[`SPI_NSS_NUM-1:0]);
-
-  assign s_tx_trg   = (cpol_i ^ cpha_i ? s_pos_edge : s_neg_edge) && ~last_o;
-  // s_rx_trg
-  assign busy_o     = ~s_trans_done;
+  assign s_par_trg = s_ser_cnt_q == snm_i;
+  always_comb begin
+    s_ser_cnt_d = s_ser_cnt_q;
+    if (s_st_fe_trg) begin
+      s_ser_cnt_d = 1'b0;
+    end else if (s_tran_done && ~s_par_trg) begin
+      s_ser_cnt_d = s_ser_cnt_q + 1'b1;
+    end
+  end
+  dffr #(4) u_ser_cnt_dffr (
+      clk_i,
+      rst_n_i,
+      s_ser_cnt_d,
+      s_ser_cnt_q
+  );
 
   always_comb begin
-    if (s_spi_fsm_q == `SPI_FSM_WDATA || s_spi_fsm_q == `SPI_FSM_RDATA) begin
-      s_trans_done = (~(|s_dat_cnt_q)) && (~(|s_sg_cnt_q));
+    s_tran_cnt_d = s_tran_cnt_q;
+    if (~s_tran_done && st_i) begin
+      if ((~cpol_i & pos_edge_i) || (cpol_i & neg_edge_i)) begin
+        s_tran_cnt_d = s_tran_cnt_q - 1'b1;
+      end
     end else begin
-      s_trans_done = ~(|s_sg_cnt_q);
+      // s_tran_done can only mantain one cycle,
+      // (s_ser_cnt_d == snm_i) mean s_par_trg need to set valid advance by one cycle
+      if (spm_i != `SPI_STD_SPI && ~(s_ser_cnt_d == snm_i)) begin
+        s_tran_cnt_d = 7'd8;
+      end else begin
+        unique case (tdtb_i)
+          `SPI_TRANS_8_BITS: begin
+            unique case (spm_i)
+              `SPI_STD_SPI:  s_tran_cnt_d = 7'd8;
+              `SPI_DUAL_SPI: s_tran_cnt_d = 7'd4;
+              `SPI_QUAD_SPI: s_tran_cnt_d = 7'd2;
+              default:       s_tran_cnt_d = 7'd8;
+            endcase
+          end
+          `SPI_TRANS_16_BITS: begin
+            unique case (spm_i)
+              `SPI_STD_SPI:  s_tran_cnt_d = 7'd16;
+              `SPI_DUAL_SPI: s_tran_cnt_d = 7'd8;
+              `SPI_QUAD_SPI: s_tran_cnt_d = 7'd4;
+              default:       s_tran_cnt_d = 7'd16;
+            endcase
+          end
+          `SPI_TRANS_24_BITS: begin
+            unique case (spm_i)
+              `SPI_STD_SPI:  s_tran_cnt_d = 7'd24;
+              `SPI_DUAL_SPI: s_tran_cnt_d = 7'd12;
+              `SPI_QUAD_SPI: s_tran_cnt_d = 7'd6;
+              default:       s_tran_cnt_d = 7'd24;
+            endcase
+          end
+          `SPI_TRANS_32_BITS: begin
+            unique case (spm_i)
+              `SPI_STD_SPI:  s_tran_cnt_d = 7'd32;
+              `SPI_DUAL_SPI: s_tran_cnt_d = 7'd16;
+              `SPI_QUAD_SPI: s_tran_cnt_d = 7'd8;
+              default:       s_tran_cnt_d = 7'd32;
+            endcase
+          end
+          default: s_tran_cnt_d = 7'd8;
+        endcase
+      end
+    end
+  end
+  dffrh #(`SPI_DATA_BIT_WIDTH + 2) u_tran_cnt_dffrh (
+      clk_i,
+      rst_n_i,
+      s_tran_cnt_d,
+      s_tran_cnt_q
+  );
+
+  assign s_trl_en = trl_valid_i || s_tran_done;
+  always_comb begin
+    s_trl_d = s_trl_q;
+    if (trl_valid_i) begin
+      s_trl_d = trl_i;
+    end else if (s_tran_done) begin
+      s_trl_d = s_trl_q - 1'b1;
+    end
+  end
+  dffer #(`SPI_TRL_WIDTH) u_trl_dffer (
+      clk_i,
+      rst_n_i,
+      s_trl_en,
+      s_trl_d,
+      s_trl_q
+  );
+
+  always_comb begin
+    s_busy_d = s_busy_q;
+    if (~s_busy_q && st_i) begin
+      s_busy_d = 1'b1;
+    end else if (s_busy_q && last_o) begin
+      s_busy_d = 1'b0;
+    end
+  end
+  dffr #(1) u_busy_dffr (
+      clk_i,
+      rst_n_i,
+      s_busy_d,
+      s_busy_q
+  );
+
+  edge_det_sync_re #(
+      .DATA_WIDTH(1)
+  ) u_st_re (
+      clk_i,
+      rst_n_i,
+      st_i,
+      s_st_re_trg
+  );
+
+  edge_det_sync_fe #(
+      .DATA_WIDTH(1)
+  ) u_st_fe (
+      clk_i,
+      rst_n_i,
+      st_i,
+      s_st_fe_trg
+  );
+
+  edge_det_sync_fe #(
+      .DATA_WIDTH(1)
+  ) u_trand_done_fe (
+      clk_i,
+      rst_n_i,
+      s_tran_done,
+      s_tran_done_fe_trg
+  );
+
+  // std spi tx
+  assign tx_ready_o = s_st_re_trg || s_tran_done;
+  for (genvar i = 1; i <= 4; i++) begin : SPI_TX_SHIFT_ONE_BLOCK
+    shift_reg #(
+        .DATA_WIDTH(8 * i),
+        .SHIFT_NUM (1)
+    ) u_std_spi_tx_shift_reg (
+        .clk_i     (clk_i),
+        .rst_n_i   (rst_n_i),
+        .type_i    (`SHIFT_REG_TYPE_LOGIC),
+        .dir_i     ({1'b0, lsb_i}),
+        .ld_en_i   (tx_valid_i && tx_ready_o),
+        .sft_en_i  (s_tx_trg),
+        .ser_dat_i (1'b0),
+        .par_data_i(tx_data_i[8*i-1:0]),
+        .ser_dat_o (s_std_mosi[i-1]),
+        .par_data_o()
+    );
+  end
+
+  // dual spi tx
+  for (genvar i = 1; i <= 4; i++) begin : SPI_TX_SHIFT_TWO_BLOCK
+    shift_reg #(
+        .DATA_WIDTH(8 * i),
+        .SHIFT_NUM (2)
+    ) u_dual_spi_tx_shift_reg (
+        .clk_i     (clk_i),
+        .rst_n_i   (rst_n_i),
+        .type_i    (`SHIFT_REG_TYPE_LOGIC),
+        .dir_i     ({1'b0, lsb_i}),
+        .ld_en_i   (tx_valid_i && tx_ready_o),
+        .sft_en_i  (s_tx_trg),
+        .ser_dat_i ('0),
+        .par_data_i(tx_data_i[8*i-1:0]),
+        .ser_dat_o (s_dual_wr_data[i-1]),
+        .par_data_o()
+    );
+
+    assign s_dual_io[i-1] = ~lsb_i ? s_dual_wr_data[i-1] : {s_dual_wr_data[i-1][0], s_dual_wr_data[i-1][1]};
+  end
+
+  // quad spi tx
+  for (genvar i = 1; i <= 4; i++) begin : SPI_TX_SHIFT_FOUR_BLOCK
+    shift_reg #(
+        .DATA_WIDTH(8 * i),
+        .SHIFT_NUM (4)
+    ) u_quad_spi_tx_shift_reg (
+        .clk_i     (clk_i),
+        .rst_n_i   (rst_n_i),
+        .type_i    (`SHIFT_REG_TYPE_LOGIC),
+        .dir_i     ({1'b0, lsb_i}),
+        .ld_en_i   (tx_valid_i && tx_ready_o),
+        .sft_en_i  (s_tx_trg),
+        .ser_dat_i ('0),
+        .par_data_i(tx_data_i[8*i-1:0]),
+        .ser_dat_o (s_quad_wr_data[i-1]),
+        .par_data_o()
+    );
+
+    assign s_quad_io[i-1] = ~lsb_i ? s_quad_wr_data[i-1] :
+    {s_quad_wr_data[i-1][0], s_quad_wr_data[i-1][1], s_quad_wr_data[i-1][2], s_quad_wr_data[i-1][3]};
+  end
+
+  // put data to rx fifo, delay tran done with one cycle
+  assign rx_valid_o = rwm_i && (s_st_fe_trg || (s_trl_q < cal_i && s_tran_done_fe_trg));
+  always_comb begin
+    rx_data_o = '0;
+    if (rx_valid_o && rx_ready_i) begin
+      unique case (spm_i)
+        `SPI_STD_SPI:  rx_data_o = s_std_rd_data[rdtb_i];
+        `SPI_DUAL_SPI: rx_data_o = s_dual_rd_data[rdtb_i];
+        `SPI_QUAD_SPI: rx_data_o = s_quad_rd_data[rdtb_i];
+        default:       rx_data_o = '0;
+      endcase
     end
   end
 
-  assign s_dely_done = s_dely_cnt_q == nop_i - 1;
-  always_comb begin
-    s_dely_cnt_d = '0;
-    if (s_spi_fsm_q == `SPI_FSM_NOP) begin
-      if (s_dely_cnt_q == nop_i - 1) s_dely_cnt_d = '0;
-      else s_dely_cnt_d = s_dely_cnt_q + 1'b1;
+  // std spi rx
+  for (genvar i = 1; i <= 4; i++) begin : SPI_RX_SHIFT_ONE_BLOCK
+    shift_reg #(
+        .DATA_WIDTH(8 * i),
+        .SHIFT_NUM (1)
+    ) u_std_spi_rx_shift_reg (
+        .clk_i     (clk_i),
+        .rst_n_i   (rst_n_i),
+        .type_i    (`SHIFT_REG_TYPE_SERI),
+        .dir_i     ({1'b0, lsb_i}),
+        .ld_en_i   (1'b0),
+        .sft_en_i  (s_rx_trg),
+        .ser_dat_i (s_trl_q <= cal_i ? spi_io_in_i[1] : 1'b0),
+        .par_data_i('0),
+        .ser_dat_o (),
+        .par_data_o(s_std_rd_data[i-1][8*i-1:0])
+    );
+
+    // fill unused bits
+    if (i <= 3) begin
+      assign s_std_rd_data[i-1][31:8*i] = '0;
     end
   end
-  dffr #(16) u_dely_cnt_dffr (
-      clk_i,
-      rst_n_i,
-      s_dely_cnt_d,
-      s_dely_cnt_q
-  );
 
+  // dual spi rx
+  for (genvar i = 1; i <= 4; i++) begin : SPI_RX_SHIFT_TWO_BLOCK
+    shift_reg #(
+        .DATA_WIDTH(8 * i),
+        .SHIFT_NUM (2)
+    ) u_dual_spi_rx_shift_reg (
+        .clk_i     (clk_i),
+        .rst_n_i   (rst_n_i),
+        .type_i    (`SHIFT_REG_TYPE_SERI),
+        .dir_i     ({1'b0, lsb_i}),
+        .ld_en_i   (1'b0),
+        .sft_en_i  (s_rx_trg),
+        .ser_dat_i (s_trl_q <= cal_i ? spi_io_in_i[1:0] : '0),
+        .par_data_i('0),
+        .ser_dat_o (),
+        .par_data_o(s_dual_rd_data[i-1][8*i-1:0])
+    );
 
-  always_comb begin
-    s_dat_cnt_d = '0;
-    if (s_spi_fsm_q == `SPI_FSM_WDATA) begin
-      if (s_dat_cnt_q == trl_i - 1) s_dat_cnt_d = '0;
-      else s_dat_cnt_d = s_dat_cnt_q + 1'b1;
+    // fill unused bits
+    if (i <= 3) begin
+      assign s_dual_rd_data[i-1][31:8*i] = '0;
     end
   end
-  dffr #(16) u_dat_cnt_dffr (
-      clk_i,
-      rst_n_i,
-      s_dat_cnt_d,
-      s_dat_cnt_q
-  );
 
-  spi_clkgen u_spi_clkgen (
-      .clk_i     (clk_i),
-      .rst_n_i   (rst_n_i),
-      .busy_i    (busy_o),
-      .st_i      (st_i),
-      .cpol_i    (cpol_i),
-      .div_i     (div_i),
-      .last_i    (last_o),
-      .clk_trg_o (s_clk_trg),
-      .clk_o     (spi_sck_o),
-      .pos_edge_o(s_pos_edge),
-      .neg_edge_o(s_neg_edge)
-  );
+  // quad spi rx
+  for (genvar i = 1; i <= 4; i++) begin : SPI_RX_SHIFT_FOUR_BLOCK
+    shift_reg #(
+        .DATA_WIDTH(8 * i),
+        .SHIFT_NUM (4)
+    ) u_quad_spi_rx_shift_reg (
+        .clk_i     (clk_i),
+        .rst_n_i   (rst_n_i),
+        .type_i    (`SHIFT_REG_TYPE_SERI),
+        .dir_i     ({1'b0, lsb_i}),
+        .ld_en_i   (1'b0),
+        .sft_en_i  (s_rx_trg),
+        .ser_dat_i (s_trl_q <= cal_i ? spi_io_in_i[3:0] : '0),
+        .par_data_i('0),
+        .ser_dat_o (),
+        .par_data_o(s_quad_rd_data[i-1][8*i-1:0])
+    );
 
-
-  always_comb begin
-    s_spi_fsm_d = s_spi_fsm_q;
-    unique case (s_spi_fsm_q)
-      `SPI_FSM_IDLE: begin
-        if (st_i) begin
-          if (cmode_i != '0) s_spi_fsm_d = `SPI_FSM_CMD;
-          else if (amode_i != '0) s_spi_fsm_d = `SPI_FSM_ADDR;
-          else if (almode_i != '0) s_spi_fsm_d = `SPI_FSM_ALTR;
-          else if (nop_i != '0) s_spi_fsm_d = `SPI_FSM_NOP;
-          else if (dmode_i != '0) begin
-            if (rwm_i) s_spi_fsm_d = `SPI_FSM_RDATA;
-            else s_spi_fsm_d = `SPI_FSM_WDATA;
-          end else s_spi_fsm_d = `SPI_FSM_IDLE;
-        end
-      end
-      `SPI_FSM_CMD: begin
-        if (s_trans_done) begin
-          if (amode_i != '0) s_spi_fsm_d = `SPI_FSM_ADDR;
-          else if (almode_i != '0) s_spi_fsm_d = `SPI_FSM_ALTR;
-          else if (nop_i != '0) s_spi_fsm_d = `SPI_FSM_NOP;
-          else if (dmode_i != '0) begin
-            if (rwm_i) s_spi_fsm_d = `SPI_FSM_RDATA;
-            else s_spi_fsm_d = `SPI_FSM_WDATA;
-          end else s_spi_fsm_d = `SPI_FSM_IDLE;
-        end
-      end
-      `SPI_FSM_ADDR: begin
-        if (s_trans_done) begin
-          if (almode_i != '0) s_spi_fsm_d = `SPI_FSM_ALTR;
-          else if (nop_i != '0) s_spi_fsm_d = `SPI_FSM_NOP;
-          else if (dmode_i != '0) begin
-            if (rwm_i) s_spi_fsm_d = `SPI_FSM_RDATA;
-            else s_spi_fsm_d = `SPI_FSM_WDATA;
-          end else s_spi_fsm_d = `SPI_FSM_IDLE;
-        end
-      end
-      `SPI_FSM_ALTR: begin
-        if (s_trans_done) begin
-          if (nop_i != '0) s_spi_fsm_d = `SPI_FSM_NOP;
-          else if (dmode_i != '0) begin
-            if (rwm_i) s_spi_fsm_d = `SPI_FSM_RDATA;
-            else s_spi_fsm_d = `SPI_FSM_WDATA;
-          end else s_spi_fsm_d = `SPI_FSM_IDLE;
-        end
-      end
-      `SPI_FSM_NOP: begin
-        if (s_dely_done) begin
-          if (dmode_i != '0) begin
-            if (rwm_i) s_spi_fsm_d = `SPI_FSM_RDATA;
-            else s_spi_fsm_d = `SPI_FSM_WDATA;
-          end else s_spi_fsm_d = `SPI_FSM_IDLE;
-        end
-      end
-      `SPI_FSM_WDATA: begin
-        if (s_trans_done) s_spi_fsm_d = `SPI_FSM_IDLE;
-      end
-      `SPI_FSM_RDATA: begin
-        if (s_trans_done) s_spi_fsm_d = `SPI_FSM_IDLE;
-      end
-      default: s_spi_fsm_d = `SPI_FSM_IDLE;
-    endcase
+    // fill unused bits
+    if (i <= 3) begin
+      assign s_quad_rd_data[i-1][31:8*i] = '0;
+    end
   end
-  dffr #(3) u_spi_fsm_dffr (
-      clk_i,
-      rst_n_i,
-      s_spi_fsm_d,
-      s_spi_fsm_q
-  );
-
-  // 8B
-
-  // cmd: 8, shift-1, -2, -4
-  // addr: 8~32b, shift-1, -2, -4
-  // altr: 8~32b, shift-1, -2, -4
-  // data: mulit 8~32b, shift-1, -2, -4
-  always_comb begin
-    spi_io_en_o  = '0;  // high-z
-    spi_io_out_o = '0;
-    unique case (s_spi_fsm_q)
-      `SPI_FSM_IDLE: begin
-        spi_io_en_o  = '0;
-        spi_io_out_o = '0;
-      end
-      `SPI_FSM_CMD: begin
-        unique case (cmode_i)
-          `SPI_STD_SPI: begin
-            spi_io_en_o[0]  = 1'b1;
-            spi_io_en_o[1]  = 1'b0;
-            spi_io_en_o[2]  = 1'b1;
-            spi_io_en_o[3]  = 1'b1;
-            spi_io_out_o[0] = s_tx_shift_1_dat;
-            spi_io_out_o[2] = 1'b0;
-            spi_io_out_o[3] = 1'b1;
-          end
-          `SPI_DUAL_SPI: begin
-            spi_io_en_o[0]  = 1'b1;
-            spi_io_en_o[1]  = 1'b1;
-            spi_io_en_o[2]  = 1'b1;
-            spi_io_en_o[3]  = 1'b1;
-            spi_io_out_o[0] = s_tx_shift_2_dat[0];
-            spi_io_out_o[1] = s_tx_shift_2_dat[1];
-            spi_io_out_o[2] = 1'b0;
-            spi_io_out_o[3] = 1'b1;
-          end
-          `SPI_QUAD_SPI: begin
-            spi_io_en_o[0]  = 1'b1;
-            spi_io_en_o[1]  = 1'b1;
-            spi_io_en_o[2]  = 1'b1;
-            spi_io_en_o[3]  = 1'b1;
-            spi_io_out_o[0] = s_tx_shift_4_dat[0];
-            spi_io_out_o[1] = s_tx_shift_4_dat[1];
-            spi_io_out_o[2] = s_tx_shift_4_dat[2];
-            spi_io_out_o[3] = s_tx_shift_4_dat[3];
-          end
-          default: begin
-            spi_io_en_o[0]  = 1'b1;
-            spi_io_en_o[1]  = 1'b0;
-            spi_io_en_o[2]  = 1'b1;
-            spi_io_en_o[3]  = 1'b1;
-            spi_io_out_o[0] = s_tx_shift_1_dat;
-            spi_io_out_o[2] = 1'b0;
-            spi_io_out_o[3] = 1'b1;
-          end
-        endcase
-      end
-      `SPI_FSM_ADDR: begin
-        unique case (amode_i)
-          `SPI_STD_SPI: begin
-            spi_io_en_o[0]  = 1'b1;
-            spi_io_en_o[1]  = 1'b0;
-            spi_io_en_o[2]  = 1'b1;
-            spi_io_en_o[3]  = 1'b1;
-            spi_io_out_o[0] = s_tx_shift_1_dat;
-            spi_io_out_o[2] = 1'b0;
-            spi_io_out_o[3] = 1'b1;
-          end
-          `SPI_DUAL_SPI: begin
-            spi_io_en_o[0]  = 1'b1;
-            spi_io_en_o[1]  = 1'b1;
-            spi_io_en_o[2]  = 1'b1;
-            spi_io_en_o[3]  = 1'b1;
-            spi_io_out_o[0] = s_tx_shift_2_dat[0];
-            spi_io_out_o[1] = s_tx_shift_2_dat[1];
-            spi_io_out_o[2] = 1'b0;
-            spi_io_out_o[3] = 1'b1;
-          end
-          `SPI_QUAD_SPI: begin
-            spi_io_en_o[0]  = 1'b1;
-            spi_io_en_o[1]  = 1'b1;
-            spi_io_en_o[2]  = 1'b1;
-            spi_io_en_o[3]  = 1'b1;
-            spi_io_out_o[0] = s_tx_shift_4_dat[0];
-            spi_io_out_o[1] = s_tx_shift_4_dat[1];
-            spi_io_out_o[2] = s_tx_shift_4_dat[2];
-            spi_io_out_o[3] = s_tx_shift_4_dat[3];
-          end
-          default: begin
-            spi_io_en_o[0]  = 1'b1;
-            spi_io_en_o[1]  = 1'b0;
-            spi_io_en_o[2]  = 1'b1;
-            spi_io_en_o[3]  = 1'b1;
-            spi_io_out_o[0] = s_tx_shift_1_dat;
-            spi_io_out_o[2] = 1'b0;
-            spi_io_out_o[3] = 1'b1;
-          end
-        endcase
-      end
-      `SPI_FSM_ALTR: begin
-        unique case (almode_i)
-          `SPI_STD_SPI: begin
-            spi_io_en_o[0]  = 1'b1;
-            spi_io_en_o[1]  = 1'b0;
-            spi_io_en_o[2]  = 1'b1;
-            spi_io_en_o[3]  = 1'b1;
-            spi_io_out_o[0] = s_tx_shift_1_dat;
-            spi_io_out_o[2] = 1'b0;
-            spi_io_out_o[3] = 1'b1;
-          end
-          `SPI_DUAL_SPI: begin
-            spi_io_en_o[0]  = 1'b1;
-            spi_io_en_o[1]  = 1'b1;
-            spi_io_en_o[2]  = 1'b1;
-            spi_io_en_o[3]  = 1'b1;
-            spi_io_out_o[0] = s_tx_shift_2_dat[0];
-            spi_io_out_o[1] = s_tx_shift_2_dat[1];
-            spi_io_out_o[2] = 1'b0;
-            spi_io_out_o[3] = 1'b1;
-          end
-          `SPI_QUAD_SPI: begin
-            spi_io_en_o[0]  = 1'b1;
-            spi_io_en_o[1]  = 1'b1;
-            spi_io_en_o[2]  = 1'b1;
-            spi_io_en_o[3]  = 1'b1;
-            spi_io_out_o[0] = s_tx_shift_4_dat[0];
-            spi_io_out_o[1] = s_tx_shift_4_dat[1];
-            spi_io_out_o[2] = s_tx_shift_4_dat[2];
-            spi_io_out_o[3] = s_tx_shift_4_dat[3];
-          end
-          default: begin
-            spi_io_en_o[0]  = 1'b1;
-            spi_io_en_o[1]  = 1'b0;
-            spi_io_en_o[2]  = 1'b1;
-            spi_io_en_o[3]  = 1'b1;
-            spi_io_out_o[0] = s_tx_shift_1_dat;
-            spi_io_out_o[2] = 1'b0;
-            spi_io_out_o[3] = 1'b1;
-          end
-        endcase
-      end
-      `SPI_FSM_NOP: begin
-        spi_io_en_o  = '1;
-        spi_io_out_o = '0;
-      end
-      `SPI_FSM_WDATA: begin
-        unique case (dmode_i)
-          `SPI_STD_SPI: begin
-            spi_io_en_o[0]  = 1'b1;
-            spi_io_en_o[1]  = 1'b0;
-            spi_io_en_o[2]  = 1'b1;
-            spi_io_en_o[3]  = 1'b1;
-            spi_io_out_o[0] = s_tx_shift_1_dat;
-            spi_io_out_o[2] = 1'b0;
-            spi_io_out_o[3] = 1'b1;
-          end
-          `SPI_DUAL_SPI: begin
-            spi_io_en_o[0]  = 1'b1;
-            spi_io_en_o[1]  = 1'b1;
-            spi_io_en_o[2]  = 1'b1;
-            spi_io_en_o[3]  = 1'b1;
-            spi_io_out_o[0] = s_tx_shift_2_dat[0];
-            spi_io_out_o[1] = s_tx_shift_2_dat[1];
-            spi_io_out_o[2] = 1'b0;
-            spi_io_out_o[3] = 1'b1;
-          end
-          `SPI_QUAD_SPI: begin
-            spi_io_en_o[0]  = 1'b1;
-            spi_io_en_o[1]  = 1'b1;
-            spi_io_en_o[2]  = 1'b1;
-            spi_io_en_o[3]  = 1'b1;
-            spi_io_out_o[0] = s_tx_shift_4_dat[0];
-            spi_io_out_o[1] = s_tx_shift_4_dat[1];
-            spi_io_out_o[2] = s_tx_shift_4_dat[2];
-            spi_io_out_o[3] = s_tx_shift_4_dat[3];
-          end
-          default: begin
-            spi_io_en_o[0]  = 1'b1;
-            spi_io_en_o[1]  = 1'b0;
-            spi_io_en_o[2]  = 1'b1;
-            spi_io_en_o[3]  = 1'b1;
-            spi_io_out_o[0] = s_tx_shift_1_dat;
-            spi_io_out_o[2] = 1'b0;
-            spi_io_out_o[3] = 1'b1;
-          end
-        endcase
-      end
-      `SPI_FSM_RDATA: begin
-        unique case (dmode_i)
-          `SPI_STD_SPI: begin
-            spi_io_en_o[0]  = 1'b1;
-            spi_io_en_o[1]  = 1'b0;
-            spi_io_en_o[2]  = 1'b1;
-            spi_io_en_o[3]  = 1'b1;
-            spi_io_out_o[0] = s_tx_shift_1_dat;
-            spi_io_out_o[2] = 1'b0;
-            spi_io_out_o[3] = 1'b1;
-          end
-          `SPI_DUAL_SPI: begin
-            spi_io_en_o[0]  = 1'b0;
-            spi_io_en_o[1]  = 1'b0;
-            spi_io_en_o[2]  = 1'b1;
-            spi_io_en_o[3]  = 1'b1;
-            spi_io_out_o[0] = 1'b0;
-            spi_io_out_o[1] = 1'b0;
-            spi_io_out_o[2] = 1'b0;
-            spi_io_out_o[3] = 1'b1;
-          end
-          `SPI_QUAD_SPI: begin
-            spi_io_en_o[0]  = 1'b0;
-            spi_io_en_o[1]  = 1'b0;
-            spi_io_en_o[2]  = 1'b0;
-            spi_io_en_o[3]  = 1'b0;
-            spi_io_out_o[0] = 1'b0;
-            spi_io_out_o[1] = 1'b0;
-            spi_io_out_o[2] = 1'b0;
-            spi_io_out_o[3] = 1'b0;
-          end
-          default: begin
-            spi_io_en_o[0]  = 1'b1;
-            spi_io_en_o[1]  = 1'b0;
-            spi_io_en_o[2]  = 1'b1;
-            spi_io_en_o[3]  = 1'b1;
-            spi_io_out_o[0] = s_tx_shift_1_dat;
-            spi_io_out_o[2] = 1'b0;
-            spi_io_out_o[3] = 1'b1;
-          end
-        endcase
-      end
-      default: begin
-        spi_io_en_o  = '0;
-        spi_io_out_o = '0;
-      end
-    endcase
-  end
-
-  // split the data into 8b type
-  always_comb begin
-    s_tx_data  = '0;
-    s_sg_cnt_d = '0;
-    unique case (s_spi_fsm_q)
-      `SPI_FSM_IDLE: s_tx_data = '0;
-      `SPI_FSM_CMD:  s_tx_data = cmd_i;
-      `SPI_FSM_ADDR: begin
-        // 8~32b split
-        // asize_i: 
-        // 0->[7:0]
-        // 1->[15:8] [7:0]
-        // 2->[23:16] [15:8] [7:0]
-        // 3->[31:24] [23:16] [15:8] [7:0]
-        if (s_sg_cnt_q == '0) s_sg_cnt_d = asize_i + 1'b1;
-        else s_sg_cnt_d = s_sg_cnt_q - 1'b1;
-        s_tx_data = addr_i[s_sg_cnt_d*8-1-:8];
-      end
-      `SPI_FSM_ALTR: begin
-        if (s_sg_cnt_q == '0) s_sg_cnt_d = alsize_i + 1'b1;
-        else s_sg_cnt_d = s_sg_cnt_q - 1'b1;
-        s_tx_data = addr_i[s_sg_cnt_d*8-1-:8];
-      end
-      `SPI_FSM_NOP: begin  // dely_cnt to calc the period of the sck
-        s_tx_data  = '0;
-        s_sg_cnt_d = '0;
-      end
-      `SPI_FSM_WDATA: begin  // 
-        if (s_sg_cnt_q == '0) s_sg_cnt_d = dsize_i + 1'b1;
-        else s_sg_cnt_d = s_sg_cnt_q - 1'b1;
-        s_tx_data = tx_data_i[s_sg_cnt_d*8-1-:8];
-      end
-      `SPI_FSM_RDATA: begin
-        s_tx_data  = '0;
-        s_sg_cnt_d = '0;
-      end
-      default: begin
-        s_tx_data  = '0;
-        s_sg_cnt_d = '0;
-      end
-    endcase
-  end
-  dffr #(3) u_sg_cnt_dffr (
-      clk_i,
-      rst_n_i,
-      s_sg_cnt_d,
-      s_sg_cnt_q
-  );
-
-
-
-
-
-  shift_reg #(
-      .DATA_WIDTH(8),
-      .SHIFT_NUM (1)
-  ) u_std_spi_tx_shift_reg (
-      .clk_i     (clk_i),
-      .rst_n_i   (rst_n_i),
-      .type_i    (`SHIFT_REG_TYPE_LOGIC),
-      .dir_i     ({1'b0, lsb_i}),
-      .ld_en_i   (s_tx_shift_1_ld),
-      .sft_en_i  (s_tx_trg),
-      .ser_dat_i ('0),
-      .par_data_i(s_tx_data),
-      .ser_dat_o (s_tx_shift_1_dat),
-      .par_data_o()
-  );
-
-  shift_reg #(
-      .DATA_WIDTH(8),
-      .SHIFT_NUM (2)
-  ) u_dual_spi_tx_shift_reg (
-      .clk_i     (clk_i),
-      .rst_n_i   (rst_n_i),
-      .type_i    (`SHIFT_REG_TYPE_LOGIC),
-      .dir_i     ({1'b0, lsb_i}),
-      .ld_en_i   (s_tx_shift_2_ld),
-      .sft_en_i  (s_tx_trg),
-      .ser_dat_i ('0),
-      .par_data_i(s_tx_data),
-      .ser_dat_o (s_tx_shift_2_dat),
-      .par_data_o()
-  );
-
-  shift_reg #(
-      .DATA_WIDTH(8),
-      .SHIFT_NUM (4)
-  ) u_quad_spi_tx_shift_reg (
-      .clk_i     (clk_i),
-      .rst_n_i   (rst_n_i),
-      .type_i    (`SHIFT_REG_TYPE_LOGIC),
-      .dir_i     ({1'b0, lsb_i}),
-      .ld_en_i   (s_tx_shift_4_ld),
-      .sft_en_i  (s_tx_trg),
-      .ser_dat_i ('0),
-      .par_data_i(s_tx_data),
-      .ser_dat_o (s_tx_shift_4_dat),
-      .par_data_o()
-  );
-
 endmodule

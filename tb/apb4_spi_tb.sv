@@ -44,7 +44,7 @@ module apb4_spi_tb ();
   for (genvar i = 0; i < 4; i++) begin : SPI_TB_PAD_BLOCK
     tri_pd_pad_h u_spi_io_pad (
         .i_i   (u_spi_if.spi_io_out_o[i]),
-        .oen_i (u_spi_if.spi_io_en_o[i]),
+        .oen_i (~u_spi_if.spi_io_en_o[i]),
         .ren_i (),
         .c_o   (u_spi_if.spi_io_in_i[i]),
         .pad_io(s_spi_io_pad[i])
@@ -60,12 +60,12 @@ module apb4_spi_tb ();
       .spi (u_spi_if.dut)
   );
 
-  // W25Q128JVxIM u_W25Q128JVxIM (
-  //     .CSn  (u_spi_if.spi_nss_o[0]),
-  //     .CLK  (u_spi_if.spi_sck_o),
-  //     .DIO  (s_spi_io_pad[0]),
-  //     .DO   (s_spi_io_pad[1]),
-  //     .WPn  (s_spi_io_pad[2]),
-  //     .HOLDn(s_spi_io_pad[3])
-  // );
+  W25Q128JVxIM u_W25Q128JVxIM (
+      .CSn  (u_spi_if.spi_nss_o[0]),
+      .CLK  (u_spi_if.spi_sck_o),
+      .DIO  (s_spi_io_pad[0]),
+      .DO   (s_spi_io_pad[1]),
+      .WPn  (s_spi_io_pad[2]),
+      .HOLDn(s_spi_io_pad[3])
+  );
 endmodule
