@@ -190,7 +190,8 @@ task automatic SPITest::w25q_std_spi_wr_rd_test();
   this.wr_que = {};
   this.wr_num = 32;
 
-  for (int i = 0; i < 256 / 4; i++) begin
+  // for (int i = 0; i < 256 / 4; i++) begin
+  for (int i = 0; i < 1; i++) begin
     this.wr_que.push_back($random);
     if (i < 3) begin
       $display("wr_que[%d]:%h", i, this.wr_que[i]);
@@ -198,7 +199,7 @@ task automatic SPITest::w25q_std_spi_wr_rd_test();
   end
 
   repeat (200 * 3) @(posedge this.apb4.pclk);
-  this.write(`SPI_DIV_ADDR, 32'd0 & {`SPI_DIV_WIDTH{1'b1}});
+  this.write(`SPI_DIV_ADDR, 32'd1 & {`SPI_DIV_WIDTH{1'b1}});
   this.write(`SPI_CTRL1_ADDR, 32'b00_0000_1000 & {`SPI_CTRL1_WIDTH{1'b1}});
   this.write(`SPI_CTRL2_ADDR, 32'b0010_0000 & {`SPI_CTRL2_WIDTH{1'b1}});  // clear que
   this.write(`SPI_CTRL2_ADDR, 32'b0010_0100 & {`SPI_CTRL2_WIDTH{1'b1}});

@@ -257,7 +257,7 @@ module apb4_spi #(
       .rdtb_i      (s_bit_rdtb),
       .spm_i       (s_bit_spm),
       .snm_i       (s_bit_snm),
-      .const_i(s_bit_const),
+      .const_i     (s_bit_const),
       .cal_i       (s_spi_cal_q),
       .trl_valid_i (s_apb4_wr_hdshk && s_apb4_addr == `SPI_TRL),
       .trl_i       (apb4.pwdata[`SPI_TRL_WIDTH-1:0]),

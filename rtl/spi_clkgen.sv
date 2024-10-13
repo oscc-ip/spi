@@ -64,6 +64,7 @@ module spi_clkgen (
   always_comb begin
     s_spi_pos_edge_d = '0;
     if (busy_i && ~s_spi_clk_q && s_is_one) begin
+      s_spi_pos_edge_d = '1;
     end else if (clk_div_i == '0) begin
       if (~cpol_i) begin
         s_spi_pos_edge_d = (s_spi_clk_q || (~busy_i && st_i)) && ~last_i;
