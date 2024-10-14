@@ -23,9 +23,9 @@
  * PERMS:  | NONE  | RW    | RW    | RW   | RW  | RW  | RW  | RW  | RW   | RW   |
  * ------------------------------------------------------------------------------
  * SPI_FRAME:
- * BITS:   | 31:14 | 13:12 | 11:10 | 9:8    | 7:6    | 5:4   | 3:2   | 1:0   |
- * FIELDS: | RES   | DSIZE | DMODE | ALSIZE | ALMODE | ASIZE | AMODE | CMODE |
- * PERMS:  | NONE  | RW    | RW    | RW     | RW     | RW    | RW    | RW    |
+ * BITS:   | 31:26 | 25:24 | 23:22 | 21:14 | 13:12 | 11:10 | 9:8    | 7:6    | 5:4   | 3:2   | 1:0   |
+ * FIELDS: | RES   | TCHD  | TCSP  | RECY  | DSIZE | DMODE | ALSIZE | ALMODE | ASIZE | AMODE | CMODE |
+ * PERMS:  | NONE  | RW    | RW    | RW    | RW    | RW    | RW     | RW     | RW    | RW    | RW    |
  * ------------------------------------------------------------------------------
  * SPI_CMD:
  * BITS:   | 31:8  | 7:0 |
@@ -43,14 +43,14 @@
  * PERMS:  | RW   |
  * ------------------------------------------------------------------------------
  * SPI_NOP:
- * BITS:   | 31:16 | 15:0 |
- * FIELDS: | RES   | NOP  |
- * PERMS:  | NONE  | RW   |
+ * BITS:   | 31:10 | 9:0 |
+ * FIELDS: | RES   | NOP |
+ * PERMS:  | NONE  | RW  |
  * ------------------------------------------------------------------------------
  * SPI_TRL:
- * BITS:   | 31:16 | 15:0 |
- * FIELDS: | RES   | TRL  |
- * PERMS:  | NONE  | WO   |
+ * BITS:   | 31:10 | 9:0 |
+ * FIELDS: | RES   | TRL |
+ * PERMS:  | NONE  | WO  |
  * ------------------------------------------------------------------------------
  * SPI_TXR:
  * BITS:   | 31:8  | 7:0    |
@@ -96,34 +96,33 @@
 
 `define SPI_CTRL_WIDTH  9
 `define SPI_FMT_WIDTH   27
-`define SPI_FRAME_WIDTH 14
+`define SPI_FRAME_WIDTH 26
 `define SPI_CMD_WIDTH   8
 `define SPI_ADDR_WIDTH  32
 `define SPI_ALTR_WIDTH  32
-`define SPI_NOP_WIDTH   16
-`define SPI_TRL_WIDTH   16
+`define SPI_NOP_WIDTH   10
+`define SPI_TRL_WIDTH   10
 `define SPI_TXR_WIDTH   32
 `define SPI_RXR_WIDTH   32
 `define SPI_STAT_WIDTH  5
 
 `define SPI_NSS_NUM 1
 
-`define SPI_SKIP          2'b00
-`define SPI_STD_SPI       2'b01
-`define SPI_DUAL_SPI      2'b10
-`define SPI_QUAD_SPI      2'b11
+`define SPI_MODE_SKIP     2'b00
+`define SPI_MODE_STD_SPI  2'b01
+`define SPI_MODE_DUAL_SPI 2'b10
+`define SPI_MODE_QUAD_SPI 2'b11
 
 `define SPI_TRANS_8_BITS  2'b00
 `define SPI_TRANS_16_BITS 2'b01
 `define SPI_TRANS_24_BITS 2'b10
 `define SPI_TRANS_32_BITS 2'b11
 
-`define SPI_PSCR_DIV1     8'd0
-`define SPI_PSCR_DIV2     8'd1
-`define SPI_PSCR_DIV4     8'd2
-`define SPI_PSCR_DIV8     8'd3
-`define SPI_PSCR_DIV16    8'd4
-`define SPI_PSCR_DIV32    8'd5
+`define SPI_PSCR_DIV2     8'd0
+`define SPI_PSCR_DIV4     8'd1
+`define SPI_PSCR_DIV8     8'd2
+`define SPI_PSCR_DIV16    8'd3
+`define SPI_PSCR_DIV32    8'd4
 
 `define SPI_FSM_IDLE      4'd0
 `define SPI_FSM_TCSP      4'd1

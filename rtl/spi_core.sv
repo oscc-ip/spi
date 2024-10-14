@@ -32,11 +32,14 @@ module spi_core #(
     input  logic [             1:0] alsize_i,
     input  logic [             1:0] dmode_i,
     input  logic [             1:0] dsize_i,
+    input  logic [             7:0] recy_i,
+    input  logic [             1:0] tcsp_i,
+    input  logic [             1:0] tchd_i,
     input  logic [             7:0] cmd_i,
     input  logic [            31:0] addr_i,
     input  logic [            31:0] altr_i,
-    input  logic [            15:0] nop_i,
-    input  logic [            15:0] trl_i,
+    input  logic [             9:0] nop_i,
+    input  logic [             9:0] trl_i,
     input  logic                    cpol_i,
     input  logic                    cpha_i,
     input  logic [             7:0] div_i,
@@ -64,7 +67,7 @@ module spi_core #(
   logic s_xfer_done;
   // clk
   logic [7:0] s_div_val, s_clk_cnt;
-  logic s_spi_clk;
+  logic s_spi_clk, s_clk_fir_edge_trg, s_clk_sec_edge_trg;
   // tx data
   logic s_tx_shift_1_ld, s_tx_shift_2_ld, s_tx_shift_4_ld;
   logic       s_tx_trg;
@@ -76,7 +79,7 @@ module spi_core #(
   // assign
   assign s_ce_fsm_low_bound  = s_fsm_state_q > `SPI_FSM_TCSP;
   assign s_ce_fsm_high_bound = s_fsm_state_q < `SPI_FSM_TCHD;
-  assign s_xfer_done         = '0;
+  assign s_xfer_done         = s_fsm_cnt_q == '0 && 1'b0;  // TODO:
   assign s_tx_trg            = '0;
 
   assign spi_sck_o           = s_ce_fsm_low_bound && s_ce_fsm_high_bound ? s_spi_clk : '0;
@@ -90,11 +93,9 @@ module spi_core #(
   assign s_nss_sel           = (nss_i & {4{busy_o & ass_i}}) | (nss_i & {4{~ass_i}});
   assign spi_nss_o           = ~(s_nss_sel[`SPI_NSS_NUM-1:0] ^ csv_i[`SPI_NSS_NUM-1:0]);
 
-
   always_comb begin
     s_div_val = 8'd1;
     unique case (div_i)
-      `SPI_PSCR_DIV1:  s_div_val = 8'd0;
       `SPI_PSCR_DIV2:  s_div_val = 8'd1;
       `SPI_PSCR_DIV4:  s_div_val = 8'd3;
       `SPI_PSCR_DIV8:  s_div_val = 8'd7;
@@ -108,21 +109,23 @@ module spi_core #(
       .DIV_VALUE_WIDTH (8),
       .DONE_DELAY_WIDTH(3)
   ) u_clk_int_div_simple (
-      .clk_i      (clk_i),
-      .rst_n_i    (rst_n_i),
-      .div_i      (s_div_val),
-      .div_valid_i(~busy_o),
-      .clk_init_i (cpol_i),
-      .div_ready_o(),
-      .div_done_o (),
-      .clk_cnt_o  (s_clk_cnt),
-      .clk_trg_o  (),
-      .clk_o      (s_spi_clk)
+      .clk_i        (clk_i),
+      .rst_n_i      (rst_n_i),
+      .div_i        (s_div_val),
+      .div_valid_i  (~busy_o),
+      .clk_init_i   (cpol_i),
+      .div_ready_o  (),
+      .div_done_o   (),
+      .clk_cnt_o    (s_clk_cnt),
+      .clk_fir_trg_o(s_clk_fir_edge_trg),
+      .clk_sec_trg_o(s_clk_sec_edge_trg),
+      .clk_o        (s_spi_clk)
   );
 
   // 1. delay some cycles to meet tCSP at negedge of ce
   // 2. align the first posedge of spi_sck when ce == 0
   // 3. delay some cycles to meet tCHD at posedge of ce
+  // std(mode1): 8 dul(mode2): 4 quad(mod3): 2
   always_comb begin
     s_fsm_state_d = s_fsm_state_q;
     s_fsm_cnt_d   = s_fsm_cnt_q;
@@ -130,71 +133,112 @@ module spi_core #(
       `SPI_FSM_IDLE: begin
         if (st_i) begin
           s_fsm_state_d = `SPI_FSM_TCSP;
+          s_fsm_cnt_d   = {8'd0, tcsp_i};
         end
       end
       `SPI_FSM_TCSP: begin
         if (s_xfer_done) begin
-          if (cmode_i != '0) s_fsm_state_d = `SPI_FSM_CMD;
-          else if (amode_i != '0) s_fsm_state_d = `SPI_FSM_ADDR;
-          else if (almode_i != '0) s_fsm_state_d = `SPI_FSM_ALTR;
-          else if (nop_i != '0) s_fsm_state_d = `SPI_FSM_NOP;
-          else if (dmode_i != '0) begin
+          if (cmode_i != `SPI_MODE_SKIP) begin
+            s_fsm_state_d = `SPI_FSM_CMD;
+            s_fsm_cnt_d   = 10'd1;
+          end else if (amode_i != `SPI_MODE_SKIP) begin
+            s_fsm_state_d = `SPI_FSM_ADDR;
+            s_fsm_cnt_d   = {8'd0, asize_i};
+          end else if (almode_i != `SPI_MODE_SKIP) begin
+            s_fsm_state_d = `SPI_FSM_ALTR;
+            s_fsm_cnt_d   = {8'd0, alsize_i};
+          end else if (nop_i != '0) begin
+            s_fsm_state_d = `SPI_FSM_NOP;
+            s_fsm_cnt_d   = nop_i;
+          end else if (dmode_i != `SPI_MODE_SKIP) begin
             if (rwm_i) s_fsm_state_d = `SPI_FSM_RDATA;
             else s_fsm_state_d = `SPI_FSM_WDATA;
+            s_fsm_cnt_d = trl_i;
           end else s_fsm_state_d = `SPI_FSM_IDLE;
         end
       end
       `SPI_FSM_CMD: begin
         if (s_xfer_done) begin
-          if (amode_i != '0) s_fsm_state_d = `SPI_FSM_ADDR;
-          else if (almode_i != '0) s_fsm_state_d = `SPI_FSM_ALTR;
-          else if (nop_i != '0) s_fsm_state_d = `SPI_FSM_NOP;
-          else if (dmode_i != '0) begin
+          if (amode_i != `SPI_MODE_SKIP) begin
+            s_fsm_state_d = `SPI_FSM_ADDR;
+            s_fsm_cnt_d   = {8'd0, asize_i};
+          end else if (almode_i != `SPI_MODE_SKIP) begin
+            s_fsm_state_d = `SPI_FSM_ALTR;
+            s_fsm_cnt_d   = {8'd0, alsize_i};
+          end else if (nop_i != '0) begin
+            s_fsm_state_d = `SPI_FSM_NOP;
+            s_fsm_cnt_d   = nop_i;
+          end else if (dmode_i != `SPI_MODE_SKIP) begin
             if (rwm_i) s_fsm_state_d = `SPI_FSM_RDATA;
             else s_fsm_state_d = `SPI_FSM_WDATA;
+            s_fsm_cnt_d = trl_i;
           end else s_fsm_state_d = `SPI_FSM_IDLE;
         end
       end
       `SPI_FSM_ADDR: begin
         if (s_xfer_done) begin
-          if (almode_i != '0) s_fsm_state_d = `SPI_FSM_ALTR;
-          else if (nop_i != '0) s_fsm_state_d = `SPI_FSM_NOP;
-          else if (dmode_i != '0) begin
+          if (almode_i != `SPI_MODE_SKIP) begin
+            s_fsm_state_d = `SPI_FSM_ALTR;
+            s_fsm_cnt_d   = {8'd0, alsize_i};
+          end else if (nop_i != '0) begin
+            s_fsm_state_d = `SPI_FSM_NOP;
+            s_fsm_cnt_d   = nop_i;
+          end else if (dmode_i != `SPI_MODE_SKIP) begin
             if (rwm_i) s_fsm_state_d = `SPI_FSM_RDATA;
             else s_fsm_state_d = `SPI_FSM_WDATA;
+            s_fsm_cnt_d = trl_i;
           end else s_fsm_state_d = `SPI_FSM_IDLE;
         end
       end
       `SPI_FSM_ALTR: begin
         if (s_xfer_done) begin
-          if (nop_i != '0) s_fsm_state_d = `SPI_FSM_NOP;
-          else if (dmode_i != '0) begin
+          if (nop_i != '0) begin
+            s_fsm_state_d = `SPI_FSM_NOP;
+            s_fsm_cnt_d   = nop_i;
+          end else if (dmode_i != `SPI_MODE_SKIP) begin
             if (rwm_i) s_fsm_state_d = `SPI_FSM_RDATA;
             else s_fsm_state_d = `SPI_FSM_WDATA;
+            s_fsm_cnt_d = trl_i;
           end else s_fsm_state_d = `SPI_FSM_IDLE;
         end
       end
       `SPI_FSM_NOP: begin
         if (s_xfer_done) begin
-          if (dmode_i != '0) begin
+          if (dmode_i != `SPI_MODE_SKIP) begin
             if (rwm_i) s_fsm_state_d = `SPI_FSM_RDATA;
             else s_fsm_state_d = `SPI_FSM_WDATA;
+            s_fsm_cnt_d = trl_i;
           end else s_fsm_state_d = `SPI_FSM_IDLE;
         end
       end
       `SPI_FSM_WDATA: begin
-        if (s_xfer_done) s_fsm_state_d = `SPI_FSM_TCHD;
+        if (s_xfer_done) begin
+          s_fsm_state_d = `SPI_FSM_TCHD;
+          s_fsm_cnt_d   = tchd_i;
+        end
       end
       `SPI_FSM_RDATA: begin
-        if (s_xfer_done) s_fsm_state_d = `SPI_FSM_TCHD;
+        if (s_xfer_done) begin
+          s_fsm_state_d = `SPI_FSM_TCHD;
+          s_fsm_cnt_d   = tchd_i;
+        end
       end
       `SPI_FSM_TCHD: begin
-        if (s_xfer_done) s_fsm_state_d = `SPI_FSM_RECY;
+        if (s_xfer_done) begin
+          s_fsm_state_d = `SPI_FSM_RECY;
+          s_fsm_cnt_d   = recy_i;
+        end
       end
       `SPI_FSM_RECY: begin
-        if (s_xfer_done) s_fsm_state_d = `SPI_FSM_IDLE;
+        if (s_xfer_done) begin
+          s_fsm_state_d = `SPI_FSM_IDLE;
+          s_fsm_cnt_d   = '1;
+        end
       end
-      default: s_fsm_state_d = `SPI_FSM_IDLE;
+      default: begin
+        s_fsm_state_d = `SPI_FSM_IDLE;
+        s_fsm_cnt_d   = '1;
+      end
     endcase
   end
   dffr #(4) u_spi_fsm_dffr (
@@ -214,7 +258,7 @@ module spi_core #(
       end
       `SPI_FSM_CMD: begin
         unique case (cmode_i)
-          `SPI_STD_SPI: begin
+          `SPI_MODE_STD_SPI: begin
             spi_io_en_o[0]  = 1'b1;
             spi_io_en_o[1]  = 1'b0;
             spi_io_en_o[2]  = 1'b1;
@@ -223,7 +267,7 @@ module spi_core #(
             spi_io_out_o[2] = 1'b0;
             spi_io_out_o[3] = 1'b1;
           end
-          `SPI_DUAL_SPI: begin
+          `SPI_MODE_DUAL_SPI: begin
             spi_io_en_o[0]  = 1'b1;
             spi_io_en_o[1]  = 1'b1;
             spi_io_en_o[2]  = 1'b1;
@@ -233,7 +277,7 @@ module spi_core #(
             spi_io_out_o[2] = 1'b0;
             spi_io_out_o[3] = 1'b1;
           end
-          `SPI_QUAD_SPI: begin
+          `SPI_MODE_QUAD_SPI: begin
             spi_io_en_o[0]  = 1'b1;
             spi_io_en_o[1]  = 1'b1;
             spi_io_en_o[2]  = 1'b1;
@@ -256,7 +300,7 @@ module spi_core #(
       end
       `SPI_FSM_ADDR: begin
         unique case (amode_i)
-          `SPI_STD_SPI: begin
+          `SPI_MODE_STD_SPI: begin
             spi_io_en_o[0]  = 1'b1;
             spi_io_en_o[1]  = 1'b0;
             spi_io_en_o[2]  = 1'b1;
@@ -265,7 +309,7 @@ module spi_core #(
             spi_io_out_o[2] = 1'b0;
             spi_io_out_o[3] = 1'b1;
           end
-          `SPI_DUAL_SPI: begin
+          `SPI_MODE_DUAL_SPI: begin
             spi_io_en_o[0]  = 1'b1;
             spi_io_en_o[1]  = 1'b1;
             spi_io_en_o[2]  = 1'b1;
@@ -275,7 +319,7 @@ module spi_core #(
             spi_io_out_o[2] = 1'b0;
             spi_io_out_o[3] = 1'b1;
           end
-          `SPI_QUAD_SPI: begin
+          `SPI_MODE_QUAD_SPI: begin
             spi_io_en_o[0]  = 1'b1;
             spi_io_en_o[1]  = 1'b1;
             spi_io_en_o[2]  = 1'b1;
@@ -298,7 +342,7 @@ module spi_core #(
       end
       `SPI_FSM_ALTR: begin
         unique case (almode_i)
-          `SPI_STD_SPI: begin
+          `SPI_MODE_STD_SPI: begin
             spi_io_en_o[0]  = 1'b1;
             spi_io_en_o[1]  = 1'b0;
             spi_io_en_o[2]  = 1'b1;
@@ -307,7 +351,7 @@ module spi_core #(
             spi_io_out_o[2] = 1'b0;
             spi_io_out_o[3] = 1'b1;
           end
-          `SPI_DUAL_SPI: begin
+          `SPI_MODE_DUAL_SPI: begin
             spi_io_en_o[0]  = 1'b1;
             spi_io_en_o[1]  = 1'b1;
             spi_io_en_o[2]  = 1'b1;
@@ -317,7 +361,7 @@ module spi_core #(
             spi_io_out_o[2] = 1'b0;
             spi_io_out_o[3] = 1'b1;
           end
-          `SPI_QUAD_SPI: begin
+          `SPI_MODE_QUAD_SPI: begin
             spi_io_en_o[0]  = 1'b1;
             spi_io_en_o[1]  = 1'b1;
             spi_io_en_o[2]  = 1'b1;
@@ -344,7 +388,7 @@ module spi_core #(
       end
       `SPI_FSM_WDATA: begin
         unique case (dmode_i)
-          `SPI_STD_SPI: begin
+          `SPI_MODE_STD_SPI: begin
             spi_io_en_o[0]  = 1'b1;
             spi_io_en_o[1]  = 1'b0;
             spi_io_en_o[2]  = 1'b1;
@@ -353,7 +397,7 @@ module spi_core #(
             spi_io_out_o[2] = 1'b0;
             spi_io_out_o[3] = 1'b1;
           end
-          `SPI_DUAL_SPI: begin
+          `SPI_MODE_DUAL_SPI: begin
             spi_io_en_o[0]  = 1'b1;
             spi_io_en_o[1]  = 1'b1;
             spi_io_en_o[2]  = 1'b1;
@@ -363,7 +407,7 @@ module spi_core #(
             spi_io_out_o[2] = 1'b0;
             spi_io_out_o[3] = 1'b1;
           end
-          `SPI_QUAD_SPI: begin
+          `SPI_MODE_QUAD_SPI: begin
             spi_io_en_o[0]  = 1'b1;
             spi_io_en_o[1]  = 1'b1;
             spi_io_en_o[2]  = 1'b1;
@@ -386,7 +430,7 @@ module spi_core #(
       end
       `SPI_FSM_RDATA: begin
         unique case (dmode_i)
-          `SPI_STD_SPI: begin
+          `SPI_MODE_STD_SPI: begin
             spi_io_en_o[0]  = 1'b1;
             spi_io_en_o[1]  = 1'b0;
             spi_io_en_o[2]  = 1'b1;
@@ -395,7 +439,7 @@ module spi_core #(
             spi_io_out_o[2] = 1'b0;
             spi_io_out_o[3] = 1'b1;
           end
-          `SPI_DUAL_SPI: begin
+          `SPI_MODE_DUAL_SPI: begin
             spi_io_en_o[0]  = 1'b0;
             spi_io_en_o[1]  = 1'b0;
             spi_io_en_o[2]  = 1'b1;
@@ -405,7 +449,7 @@ module spi_core #(
             spi_io_out_o[2] = 1'b0;
             spi_io_out_o[3] = 1'b1;
           end
-          `SPI_QUAD_SPI: begin
+          `SPI_MODE_QUAD_SPI: begin
             spi_io_en_o[0]  = 1'b0;
             spi_io_en_o[1]  = 1'b0;
             spi_io_en_o[2]  = 1'b0;

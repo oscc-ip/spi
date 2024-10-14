@@ -43,11 +43,12 @@ module apb4_spi #(
   logic s_bit_en, s_bit_txie, s_bit_rxie, s_bit_st, s_bit_rwm;
   logic s_bit_cpha, s_bit_cpol, s_bit_lsb, s_bit_rdm, s_bit_ass;
   logic [3:0] s_bit_nss, s_bit_csv;
-  logic [7:0] s_bit_div;
+  logic [7:0] s_bit_div, s_bit_recv;
   logic [4:0] s_bit_txth, s_bit_rxth;
   logic [1:0] s_bit_cmode, s_bit_amode, s_bit_asize;
   logic [1:0] s_bit_almode, s_bit_alsize;
   logic [1:0] s_bit_dmode, s_bit_dsize;
+  logic [1:0] s_bit_tcsp, s_bit_tchd;
   logic s_bit_txif, s_bit_rxif;
   // irq
   logic s_tx_irq_trg, s_rx_irq_trg;
@@ -90,6 +91,9 @@ module apb4_spi #(
   assign s_bit_alsize    = s_spi_frame_q[9:8];
   assign s_bit_dmode     = s_spi_frame_q[11:10];
   assign s_bit_dsize     = s_spi_frame_q[13:12];
+  assign s_bit_recv      = s_spi_frame_q[21:14];
+  assign s_bit_tcsp      = s_spi_frame_q[23:22];
+  assign s_bit_tchd      = s_spi_frame_q[25:24];
 
   assign s_bit_txif      = s_spi_stat_q[0];
   assign s_bit_rxif      = s_spi_stat_q[1];
@@ -301,6 +305,9 @@ module apb4_spi #(
       .alsize_i    (s_bit_alsize),
       .dmode_i     (s_bit_dmode),
       .dsize_i     (s_bit_dsize),
+      .recy_i      (s_bit_recv),
+      .tcsp_i      (s_bit_tcsp),
+      .tchd_i      (s_bit_tchd),
       .cmd_i       (s_spi_cmd_q),
       .addr_i      (s_spi_addr_q),
       .altr_i      (s_spi_altr_q),
