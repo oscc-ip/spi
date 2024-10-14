@@ -13,7 +13,7 @@
 `include "spi_define.sv"
 
 module apb4_spi #(
-    parameter int FIFO_DEPTH     = 64,
+    parameter int FIFO_DEPTH     = 512,
     parameter int LOG_FIFO_DEPTH = $clog2(FIFO_DEPTH)
 ) (
     apb4_if.slave apb4,
@@ -54,7 +54,7 @@ module apb4_spi #(
   // fifo
   logic s_tx_push_valid, s_tx_push_ready, s_tx_empty, s_tx_full, s_tx_pop_valid, s_tx_pop_ready;
   logic s_rx_push_valid, s_rx_push_ready, s_rx_empty, s_rx_full, s_rx_pop_valid, s_rx_pop_ready;
-  logic [31:0] s_tx_push_data, s_tx_pop_data, s_rx_push_data, s_rx_pop_data;
+  logic [7:0] s_tx_push_data, s_tx_pop_data, s_rx_push_data, s_rx_pop_data;
   logic [31:0] s_spi_rv_rx;
   logic [LOG_FIFO_DEPTH:0] s_tx_elem, s_rx_elem;
   // spi
@@ -186,17 +186,15 @@ module apb4_spi #(
       s_spi_trl_q
   );
 
+  // NOTE: this version only support 8b data
   always_comb begin
     s_tx_push_valid = 1'b0;
     s_tx_push_data  = '0;
     if (s_apb4_wr_hdshk && s_apb4_addr == `SPI_TXR) begin
       s_tx_push_valid = 1'b1;
       unique case (s_bit_dsize)
-        `SPI_TRANS_8_BITS:  s_tx_push_data = apb4.pwdata[7:0];
-        `SPI_TRANS_16_BITS: s_tx_push_data = apb4.pwdata[15:0];
-        `SPI_TRANS_24_BITS: s_tx_push_data = apb4.pwdata[23:0];
-        `SPI_TRANS_32_BITS: s_tx_push_data = apb4.pwdata[31:0];
-        default:            s_tx_push_data = apb4.pwdata[7:0];
+        `SPI_TRANS_8_BITS: s_tx_push_data = apb4.pwdata[7:0];
+        default:           s_tx_push_data = apb4.pwdata[7:0];
       endcase
     end
   end
@@ -223,9 +221,7 @@ module apb4_spi #(
   );
 
 
-  assign s_spi_rv_rx = {
-    s_rx_pop_data[7:0], s_rx_pop_data[15:8], s_rx_pop_data[23:16], s_rx_pop_data[31:24]
-  };
+  assign s_spi_rv_rx = s_rx_pop_data[7:0];
   always_comb begin
     apb4.prdata    = '0;
     s_rx_pop_ready = 1'b0;
@@ -253,7 +249,7 @@ module apb4_spi #(
   assign s_tx_push_ready = ~s_tx_full;
   assign s_tx_pop_valid  = ~s_tx_empty;
   fifo #(
-      .DATA_WIDTH  (32),
+      .DATA_WIDTH  (8),
       .BUFFER_DEPTH(FIFO_DEPTH)
   ) u_tx_fifo (
       .clk_i  (apb4.pclk),
@@ -271,7 +267,7 @@ module apb4_spi #(
   assign s_rx_push_ready = ~s_rx_full;
   assign s_rx_pop_valid  = ~s_rx_empty;
   fifo #(
-      .DATA_WIDTH  (32),
+      .DATA_WIDTH  (8),
       .BUFFER_DEPTH(FIFO_DEPTH)
   ) u_rx_fifo (
       .clk_i  (apb4.pclk),
@@ -286,7 +282,9 @@ module apb4_spi #(
       .dat_o  (s_rx_pop_data)
   );
 
-  spi_core u_spi_core (
+  spi_core #(
+      .FIFO_DEPTH(FIFO_DEPTH)
+  ) u_spi_core (
       .clk_i       (apb4.pclk),
       .rst_n_i     (apb4.presetn),
       .en_i        (s_bit_en),

@@ -29,8 +29,8 @@
  * ------------------------------------------------------------------------------
  * SPI_CMD:
  * BITS:   | 31:8  | 7:0 |
- * FIELDS: | RES   | CMD  |
- * PERMS:  | NONE  | RW   |
+ * FIELDS: | RES   | CMD |
+ * PERMS:  | NONE  | RW  |
  * ------------------------------------------------------------------------------
  * SPI_ADDR:
  * BITS:   | 31:0 |
@@ -53,14 +53,14 @@
  * PERMS:  | NONE  | WO   |
  * ------------------------------------------------------------------------------
  * SPI_TXR:
- * BITS:   | 31:0   |
- * FIELDS: | TXDATA |
- * PERMS:  | WO     |
+ * BITS:   | 31:8  | 7:0    |
+ * FIELDS: | RES   | TXDATA |
+ * PERMS:  | NONE  | WO     |
  * ------------------------------------------------------------------------------
  * SPI_RXR:
- * BITS:   | 31:0   |
- * FIELDS: | RXDATA |
- * PERMS:  | RO     |
+ * BITS:   | 31:8  | 7:0    |
+ * FIELDS: | RES   | RXDATA |
+ * PERMS:  | NONE  | RO     |
  * ------------------------------------------------------------------------------
  * SPI_STAT:
  * BITS:   | 31:5 | 4    | 3    | 2    | 1    | 0    |
@@ -108,24 +108,33 @@
 
 `define SPI_NSS_NUM 1
 
-`define SPI_SKIP     2'b00
-`define SPI_STD_SPI  2'b01
-`define SPI_DUAL_SPI 2'b10
-`define SPI_QUAD_SPI 2'b11
+`define SPI_SKIP          2'b00
+`define SPI_STD_SPI       2'b01
+`define SPI_DUAL_SPI      2'b10
+`define SPI_QUAD_SPI      2'b11
 
 `define SPI_TRANS_8_BITS  2'b00
 `define SPI_TRANS_16_BITS 2'b01
 `define SPI_TRANS_24_BITS 2'b10
 `define SPI_TRANS_32_BITS 2'b11
 
-`define SPI_FSM_IDLE  3'b000
-`define SPI_FSM_CMD   3'b001
-`define SPI_FSM_ADDR  3'b010
-`define SPI_FSM_ALTR  3'b011
-`define SPI_FSM_NOP   3'b100
-`define SPI_FSM_WDATA 3'b101
-`define SPI_FSM_RDATA 3'b110
+`define SPI_PSCR_DIV1     8'd0
+`define SPI_PSCR_DIV2     8'd1
+`define SPI_PSCR_DIV4     8'd2
+`define SPI_PSCR_DIV8     8'd3
+`define SPI_PSCR_DIV16    8'd4
+`define SPI_PSCR_DIV32    8'd5
 
+`define SPI_FSM_IDLE      4'd0
+`define SPI_FSM_TCSP      4'd1
+`define SPI_FSM_CMD       4'd2
+`define SPI_FSM_ADDR      4'd3
+`define SPI_FSM_ALTR      4'd4
+`define SPI_FSM_NOP       4'd5
+`define SPI_FSM_WDATA     4'd6
+`define SPI_FSM_RDATA     4'd7
+`define SPI_FSM_TCHD      4'd8
+`define SPI_FSM_RECY      4'd9
 // verilog_format: on
 
 // io0(mosi)
