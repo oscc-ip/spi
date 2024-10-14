@@ -13,7 +13,7 @@
 `include "spi_define.sv"
 
 module apb4_spi #(
-    parameter int FIFO_DEPTH     = 512,
+    parameter int FIFO_DEPTH     = 64,
     parameter int LOG_FIFO_DEPTH = $clog2(FIFO_DEPTH)
 ) (
     apb4_if.slave apb4,

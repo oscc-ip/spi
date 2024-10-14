@@ -14,7 +14,7 @@
 `include "spi_define.sv"
 
 module spi_core #(
-    parameter int FIFO_DEPTH = 512
+    parameter int FIFO_DEPTH = 64
 ) (
     input  logic                    clk_i,
     input  logic                    rst_n_i,
@@ -64,7 +64,7 @@ module spi_core #(
   logic [3:0] s_fsm_state_d, s_fsm_state_q;
   logic [9:0] s_fsm_cnt_d, s_fsm_cnt_q;
   logic s_ce_fsm_low_bound, s_ce_fsm_high_bound;
-  logic s_xfer_done;
+  logic s_xfer_flag, s_sg_xfer_done;
   // clk
   logic [7:0] s_div_val, s_clk_cnt;
   logic s_spi_clk, s_clk_fir_edge_trg, s_clk_sec_edge_trg;
@@ -79,18 +79,18 @@ module spi_core #(
   // assign
   assign s_ce_fsm_low_bound  = s_fsm_state_q > `SPI_FSM_TCSP;
   assign s_ce_fsm_high_bound = s_fsm_state_q < `SPI_FSM_TCHD;
-  assign s_xfer_done         = s_fsm_cnt_q == '0 && 1'b0;  // TODO:
+  assign s_sg_xfer_done      = s_fsm_cnt_q == '0 && 1'b1;  // TODO:
   assign s_tx_trg            = '0;
 
   assign spi_sck_o           = s_ce_fsm_low_bound && s_ce_fsm_high_bound ? s_spi_clk : '0;
-  assign busy_o              = ~(s_fsm_state_q == `SPI_FSM_IDLE || s_fsm_state_q == `SPI_FSM_RECY);
-  assign last_o              = '0;
-  assign tx_ready_o          = s_fsm_state_d == `SPI_FSM_IDLE;
-  assign rx_valid_o          = s_fsm_state_d == `SPI_FSM_IDLE;
+  assign busy_o              = ~(s_fsm_state_q == `SPI_FSM_IDLE);
+  assign tx_ready_o          = busy_o;
+  assign rx_valid_o          = busy_o;
   assign rx_data_o           = '0;
 
   // software nss ctrl is more flexible
-  assign s_nss_sel           = (nss_i & {4{busy_o & ass_i}}) | (nss_i & {4{~ass_i}});
+  assign s_xfer_flag         = ~(s_fsm_state_q == `SPI_FSM_IDLE || s_fsm_state_q == `SPI_FSM_RECY);
+  assign s_nss_sel           = (nss_i & {4{s_xfer_flag & ass_i}}) | (nss_i & {4{~ass_i}});
   assign spi_nss_o           = ~(s_nss_sel[`SPI_NSS_NUM-1:0] ^ csv_i[`SPI_NSS_NUM-1:0]);
 
   always_comb begin
@@ -112,7 +112,7 @@ module spi_core #(
       .clk_i        (clk_i),
       .rst_n_i      (rst_n_i),
       .div_i        (s_div_val),
-      .div_valid_i  (~busy_o),
+      .div_valid_i  (~s_xfer_flag),
       .clk_init_i   (cpol_i),
       .div_ready_o  (),
       .div_done_o   (),
@@ -137,7 +137,7 @@ module spi_core #(
         end
       end
       `SPI_FSM_TCSP: begin
-        if (s_xfer_done) begin
+        if (s_sg_xfer_done) begin
           if (cmode_i != `SPI_MODE_SKIP) begin
             s_fsm_state_d = `SPI_FSM_CMD;
             s_fsm_cnt_d   = 10'd1;
@@ -154,11 +154,13 @@ module spi_core #(
             if (rwm_i) s_fsm_state_d = `SPI_FSM_RDATA;
             else s_fsm_state_d = `SPI_FSM_WDATA;
             s_fsm_cnt_d = trl_i;
-          end else s_fsm_state_d = `SPI_FSM_IDLE;
+          end else s_fsm_state_d = `SPI_FSM_TCHD;
+        end else begin
+          if (s_clk_sec_edge_trg) s_fsm_cnt_d = s_fsm_cnt_q - 1'b1;
         end
       end
       `SPI_FSM_CMD: begin
-        if (s_xfer_done) begin
+        if (s_sg_xfer_done) begin
           if (amode_i != `SPI_MODE_SKIP) begin
             s_fsm_state_d = `SPI_FSM_ADDR;
             s_fsm_cnt_d   = {8'd0, asize_i};
@@ -172,11 +174,13 @@ module spi_core #(
             if (rwm_i) s_fsm_state_d = `SPI_FSM_RDATA;
             else s_fsm_state_d = `SPI_FSM_WDATA;
             s_fsm_cnt_d = trl_i;
-          end else s_fsm_state_d = `SPI_FSM_IDLE;
+          end else s_fsm_state_d = `SPI_FSM_TCHD;
+        end else begin
+          if (s_clk_sec_edge_trg) s_fsm_cnt_d = s_fsm_cnt_q - 1'b1;
         end
       end
       `SPI_FSM_ADDR: begin
-        if (s_xfer_done) begin
+        if (s_sg_xfer_done) begin
           if (almode_i != `SPI_MODE_SKIP) begin
             s_fsm_state_d = `SPI_FSM_ALTR;
             s_fsm_cnt_d   = {8'd0, alsize_i};
@@ -187,11 +191,13 @@ module spi_core #(
             if (rwm_i) s_fsm_state_d = `SPI_FSM_RDATA;
             else s_fsm_state_d = `SPI_FSM_WDATA;
             s_fsm_cnt_d = trl_i;
-          end else s_fsm_state_d = `SPI_FSM_IDLE;
+          end else s_fsm_state_d = `SPI_FSM_TCHD;
+        end else begin
+          if (s_clk_sec_edge_trg) s_fsm_cnt_d = s_fsm_cnt_q - 1'b1;
         end
       end
       `SPI_FSM_ALTR: begin
-        if (s_xfer_done) begin
+        if (s_sg_xfer_done) begin
           if (nop_i != '0) begin
             s_fsm_state_d = `SPI_FSM_NOP;
             s_fsm_cnt_d   = nop_i;
@@ -199,40 +205,52 @@ module spi_core #(
             if (rwm_i) s_fsm_state_d = `SPI_FSM_RDATA;
             else s_fsm_state_d = `SPI_FSM_WDATA;
             s_fsm_cnt_d = trl_i;
-          end else s_fsm_state_d = `SPI_FSM_IDLE;
+          end else s_fsm_state_d = `SPI_FSM_TCHD;
+        end else begin
+          if (s_clk_sec_edge_trg) s_fsm_cnt_d = s_fsm_cnt_q - 1'b1;
         end
       end
       `SPI_FSM_NOP: begin
-        if (s_xfer_done) begin
+        if (s_sg_xfer_done) begin
           if (dmode_i != `SPI_MODE_SKIP) begin
             if (rwm_i) s_fsm_state_d = `SPI_FSM_RDATA;
             else s_fsm_state_d = `SPI_FSM_WDATA;
             s_fsm_cnt_d = trl_i;
-          end else s_fsm_state_d = `SPI_FSM_IDLE;
+          end else s_fsm_state_d = `SPI_FSM_TCHD;
+        end else begin
+          if (s_clk_sec_edge_trg) s_fsm_cnt_d = s_fsm_cnt_q - 1'b1;
         end
       end
       `SPI_FSM_WDATA: begin
-        if (s_xfer_done) begin
+        if (s_sg_xfer_done) begin
           s_fsm_state_d = `SPI_FSM_TCHD;
           s_fsm_cnt_d   = tchd_i;
+        end else begin
+          if (s_clk_sec_edge_trg) s_fsm_cnt_d = s_fsm_cnt_q - 1'b1;
         end
       end
       `SPI_FSM_RDATA: begin
-        if (s_xfer_done) begin
+        if (s_sg_xfer_done) begin
           s_fsm_state_d = `SPI_FSM_TCHD;
           s_fsm_cnt_d   = tchd_i;
+        end else begin
+          if (s_clk_sec_edge_trg) s_fsm_cnt_d = s_fsm_cnt_q - 1'b1;
         end
       end
       `SPI_FSM_TCHD: begin
-        if (s_xfer_done) begin
+        if (s_sg_xfer_done) begin
           s_fsm_state_d = `SPI_FSM_RECY;
           s_fsm_cnt_d   = recy_i;
+        end else begin
+          if (s_clk_sec_edge_trg) s_fsm_cnt_d = s_fsm_cnt_q - 1'b1;
         end
       end
       `SPI_FSM_RECY: begin
-        if (s_xfer_done) begin
+        if (s_sg_xfer_done) begin
           s_fsm_state_d = `SPI_FSM_IDLE;
           s_fsm_cnt_d   = '1;
+        end else begin
+          if (s_clk_sec_edge_trg) s_fsm_cnt_d = s_fsm_cnt_q - 1'b1;
         end
       end
       default: begin
@@ -247,6 +265,15 @@ module spi_core #(
       s_fsm_state_d,
       s_fsm_state_q
   );
+
+
+  dffrh #(10) u_fsm_cnt_dffrh (
+      clk_i,
+      rst_n_i,
+      s_fsm_cnt_d,
+      s_fsm_cnt_q
+  );
+
 
   always_comb begin
     spi_io_en_o  = '0;
@@ -477,6 +504,14 @@ module spi_core #(
     endcase
   end
 
+
+
+  assign s_tx_shift_1_ld = '0;
+  assign s_tx_shift_2_ld = '0;
+  assign s_tx_shift_4_ld = '0;
+  always_comb begin
+    s_tx_data = '0;
+  end
   shift_reg #(
       .DATA_WIDTH(8),
       .SHIFT_NUM (1)
@@ -525,4 +560,10 @@ module spi_core #(
       .par_data_o()
   );
 
+  edge_det_sync_re u_xfer_done_edge_det_sync_re (
+      .clk_i  (clk_i),
+      .rst_n_i(rst_n_i),
+      .dat_i  (busy_o),
+      .re_o   (last_o)
+  );
 endmodule
